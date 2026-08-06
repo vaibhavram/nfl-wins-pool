@@ -1,13 +1,23 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { RequireAuth } from "@/components/RequireAuth";
 import { TeamLogo } from "@/components/TeamLogo";
 import { useAuth, useDraft } from "@/lib/store";
 import { TEAMS } from "@/lib/teams";
 import { COMMISSIONER } from "@/lib/managers";
-import { DRAFT_ORDER, TOTAL_PICKS } from "@/lib/draft";
+import { buildDraftOrder, TOTAL_PICKS } from "@/lib/draft";
+
+function formatRemaining(deadline: string | null, now: number): string | null {
+  if (!deadline) return null;
+  const ms = new Date(deadline).getTime() - now;
+  if (ms <= 0) return "moments";
+  const totalMin = Math.ceil(ms / 60000);
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  return h > 0 ? `${h}h ${m}m` : `${m}m`;
+}
 
 function DraftContent() {
   const router = useRouter();
@@ -16,6 +26,8 @@ function DraftContent() {
     hydrated,
     started,
     picks,
+    order,
+    deadline,
     selectedTeam,
     takenAbs,
     currentPickNo,
@@ -30,9 +42,17 @@ function DraftContent() {
   const [submitting, setSubmitting] = useState(false);
   const [sortMode, setSortMode] = useState<"alpha" | "ou">("alpha");
   const [hideDrafted, setHideDrafted] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
 
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  const draftOrder30 = useMemo(() => buildDraftOrder(order), [order]);
   const round = draftComplete ? 3 : Math.floor((currentPickNo - 1) / 10) + 1;
-  const nextManager = !draftComplete && currentPickNo < TOTAL_PICKS ? DRAFT_ORDER[currentPickNo] : null;
+  const nextManager = !draftComplete && currentPickNo < TOTAL_PICKS ? draftOrder30[currentPickNo] : null;
+  const remaining = formatRemaining(deadline, now);
 
   const sortedTeams = useMemo(() => {
     const list = hideDrafted ? TEAMS.filter((t) => !takenAbs.has(t.ab)) : TEAMS;
@@ -102,9 +122,11 @@ function DraftContent() {
           </div>
           {nextManager && <div style={{ fontSize: 11.5, color: "var(--color-accent-400)" }}>{nextManager} is next</div>}
         </div>
-        {myTurn && (
+        {remaining && !draftComplete && (
           <div style={{ fontSize: 11.5, lineHeight: 1.4, color: "var(--color-neutral-500)" }}>
-            No time limit — pick whenever you&apos;re ready. Everyone else&apos;s picks show up here as they make them.
+            {myTurn
+              ? `Pick whenever you're ready — after ${remaining}, the highest O/U team gets drafted for you automatically.`
+              : `Auto-picks for ${onClockManager} in ${remaining} if they haven't picked by then.`}
           </div>
         )}
         {pickError && (
@@ -113,7 +135,7 @@ function DraftContent() {
           </div>
         )}
         <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 2 }} className="scr">
-          {DRAFT_ORDER.map((mgr, i) => {
+          {draftOrder30.map((mgr, i) => {
             const pick = picks[i];
             const isOnClock = i === currentPickNo - 1;
             const isMine = mgr === manager?.name;

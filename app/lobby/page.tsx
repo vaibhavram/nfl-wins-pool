@@ -1,29 +1,30 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { RequireAuth } from "@/components/RequireAuth";
 import { useAuth, useDraft } from "@/lib/store";
-import { MANAGER_NAMES, COMMISSIONER, isCommissioner } from "@/lib/managers";
-import { DRAFT_ORDER } from "@/lib/draft";
+import { COMMISSIONER, isCommissioner } from "@/lib/managers";
+import { buildDraftOrder } from "@/lib/draft";
 import { usePresence } from "@/lib/live-data";
-
-function pickNumbersFor(name: string): number[] {
-  return DRAFT_ORDER.reduce<number[]>((acc, mgr, i) => {
-    if (mgr === name) acc.push(i + 1);
-    return acc;
-  }, []);
-}
 
 function LobbyContent() {
   const router = useRouter();
   const { manager, signOut } = useAuth();
-  const { picks, started, draftComplete, startDraft, resetDraft } = useDraft();
+  const { picks, started, order, draftComplete, startDraft, resetDraft } = useDraft();
   const online = usePresence();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const iAmCommissioner = isCommissioner(manager?.name);
+
+  const draftOrder30 = useMemo(() => buildDraftOrder(order), [order]);
+  function pickNumbersFor(name: string): number[] {
+    return draftOrder30.reduce<number[]>((acc, mgr, i) => {
+      if (mgr === name) acc.push(i + 1);
+      return acc;
+    }, []);
+  }
 
   async function onStart() {
     if (!manager) return;
@@ -79,7 +80,7 @@ function LobbyContent() {
           Round 1 order
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          {MANAGER_NAMES.map((name, i) => {
+          {order.map((name, i) => {
             const isMe = name === manager?.name;
             return (
               <div

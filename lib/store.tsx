@@ -10,7 +10,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { DRAFT_ORDER, TOTAL_PICKS, type Pick } from "./draft";
+import { buildDraftOrder, TOTAL_PICKS, type Pick } from "./draft";
 
 const AUTH_KEY = "nfl-pool-auth";
 const DRAFT_POLL_MS = 4000;
@@ -114,6 +114,8 @@ type DraftContextValue = {
   hydrated: boolean;
   started: boolean;
   picks: Pick[];
+  order: string[]; // 10 names, position 1 first — reshuffled on every reset
+  deadline: string | null; // ISO timestamp the current on-the-clock pick auto-resolves at
   selectedTeam: string | null;
   takenAbs: Set<string>;
   currentPickIndex: number; // -1 once complete
@@ -129,14 +131,11 @@ type DraftContextValue = {
 
 const DraftContext = createContext<DraftContextValue | null>(null);
 
-type DraftState = { hydrated: boolean; started: boolean; picks: Pick[] };
+type DraftState = { hydrated: boolean; started: boolean; picks: Pick[]; order: string[]; deadline: string | null };
+const EMPTY_DRAFT_STATE: DraftState = { hydrated: false, started: false, picks: [], order: [], deadline: null };
 
 export function DraftProvider({ children }: { children: ReactNode }) {
-  const [{ hydrated, started, picks }, setInit] = useState<DraftState>({
-    hydrated: false,
-    started: false,
-    picks: [],
-  });
+  const [{ hydrated, started, picks, order, deadline }, setInit] = useState<DraftState>(EMPTY_DRAFT_STATE);
   const [selectedTeam, setSelectedTeam] = useState<string | null>(null);
   const inFlight = useRef(false);
 
@@ -146,7 +145,13 @@ export function DraftProvider({ children }: { children: ReactNode }) {
     try {
       const res = await fetch("/api/draft/state");
       const data = await res.json();
-      setInit({ hydrated: true, started: Boolean(data.started), picks: data.picks ?? [] });
+      setInit({
+        hydrated: true,
+        started: Boolean(data.started),
+        picks: data.picks ?? [],
+        order: data.order ?? [],
+        deadline: data.deadline ?? null,
+      });
     } catch {
       setInit((s) => ({ ...s, hydrated: true }));
     } finally {
@@ -171,9 +176,10 @@ export function DraftProvider({ children }: { children: ReactNode }) {
   }, [fetchState]);
 
   const takenAbs = useMemo(() => new Set(picks.map((p) => p.teamAb)), [picks]);
+  const draftOrder30 = useMemo(() => buildDraftOrder(order), [order]);
   const currentPickIndex = picks.length < TOTAL_PICKS ? picks.length : -1;
   const currentPickNo = picks.length < TOTAL_PICKS ? picks.length + 1 : TOTAL_PICKS + 1;
-  const onClockManager = currentPickIndex === -1 ? null : DRAFT_ORDER[currentPickIndex];
+  const onClockManager = currentPickIndex === -1 ? null : draftOrder30[currentPickIndex];
   const draftComplete = currentPickIndex === -1;
 
   function selectTeam(ab: string | null) {
@@ -192,7 +198,13 @@ export function DraftProvider({ children }: { children: ReactNode }) {
         fetchState(); // our view of who's on the clock may be stale — resync
         return { ok: false, error: data.error ?? "Couldn't submit that pick." };
       }
-      setInit((s) => ({ ...s, hydrated: true, picks: data.picks }));
+      setInit({
+        hydrated: true,
+        started: Boolean(data.started),
+        picks: data.picks,
+        order: data.order ?? [],
+        deadline: data.deadline ?? null,
+      });
       setSelectedTeam(null);
       return { ok: true };
     } catch {
@@ -222,6 +234,8 @@ export function DraftProvider({ children }: { children: ReactNode }) {
     hydrated,
     started,
     picks,
+    order,
+    deadline,
     selectedTeam,
     takenAbs,
     currentPickIndex,

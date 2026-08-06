@@ -2,19 +2,24 @@ import { MANAGER_NAMES } from "./managers";
 import type { TeamRecord } from "./teams";
 
 // The pool's actual draft pattern (not a simple snake) — the "Eldorado method". Draft position
-// (1-10, matching MANAGER_NAMES order) gets 3 picks each, spread out so no position is
-// systematically stronger:
+// (1-10) gets 3 picks each, spread out so no position is systematically stronger:
 //   pos 1: 1,28,30   pos 2: 2,21,24   pos 3: 3,18,22   pos 4: 4,17,20   pos 5: 5,15,23
 //   pos 6: 6,14,26   pos 7: 7,11,29   pos 8: 8,16,19   pos 9: 9,13,25   pos 10: 10,12,27
-// Expressed here as, for each pick 1-30, which draft position (1-10) is on the clock.
+// Expressed here as, for each pick 1-30, which draft position (1-10) is on the clock. Which
+// *manager* holds each position is reshuffled on every draft reset (see lib/draft-server.ts),
+// so this pattern is applied to a dynamic position order, not a fixed one.
 const PICK_POSITIONS: number[] = [
   1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
   7, 10, 9, 6, 5, 8, 4, 3, 8, 4,
   2, 3, 5, 2, 9, 6, 10, 1, 7, 1,
 ];
 
-export const DRAFT_ORDER: string[] = PICK_POSITIONS.map((pos) => MANAGER_NAMES[pos - 1]);
-export const TOTAL_PICKS = DRAFT_ORDER.length; // 30 — 2 of 32 teams go undrafted
+export const TOTAL_PICKS = PICK_POSITIONS.length; // 30 — 2 of 32 teams go undrafted
+
+/** Turns a position order (10 names, position 1 first) into the full 30-pick draft order. */
+export function buildDraftOrder(positionOrder: string[]): string[] {
+  return PICK_POSITIONS.map((pos) => positionOrder[pos - 1]);
+}
 
 export type Pick = { pickNo: number; manager: string; teamAb: string };
 

@@ -23,6 +23,10 @@ function ensureSchema(): Promise<void> {
         started_at TIMESTAMPTZ,
         CHECK (id = 1)
       );
+      CREATE TABLE IF NOT EXISTS draft_positions (
+        position INTEGER PRIMARY KEY,
+        manager TEXT NOT NULL
+      );
     `).then(() => undefined);
   }
   return schemaReady;
