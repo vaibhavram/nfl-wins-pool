@@ -1,5 +1,5 @@
 import { MANAGER_NAMES } from "./managers";
-import { TEAMS, type TeamRecord } from "./teams";
+import type { TeamRecord } from "./teams";
 
 // The pool's actual draft pattern (not a simple snake) — the "Eldorado method". Draft position
 // (1-10, matching MANAGER_NAMES order) gets 3 picks each, spread out so no position is
@@ -18,28 +18,15 @@ export const TOTAL_PICKS = DRAFT_ORDER.length; // 30 — 2 of 32 teams go undraf
 
 export type Pick = { pickNo: number; manager: string; teamAb: string };
 
-/** Deterministic CPU pick: highest Vegas win total among teams not yet taken. */
-export function bestAvailableTeam(takenAbs: Set<string>): string {
-  const available = TEAMS.filter((t) => !takenAbs.has(t.ab));
-  available.sort((a, b) => b.ou - a.ou || a.ab.localeCompare(b.ab));
-  return available[0].ab;
-}
-
 export function rostersFromPicks(picks: Pick[]): Record<string, string[]> {
   const rosters: Record<string, string[]> = {};
   for (const name of MANAGER_NAMES) rosters[name] = [];
   for (const p of picks) {
-    // A pick's manager can be stale (e.g. the roster changed since this pick was made);
-    // skip rather than crash — isDraftStale() is what actually resets stale draft state.
+    // A pick's manager can be stale relative to a since-changed roster/pattern; skip rather
+    // than crash. The commissioner can "Reset draft" if that ever actually happens.
     if (rosters[p.manager]) rosters[p.manager].push(p.teamAb);
   }
   return rosters;
-}
-
-/** True if any persisted pick no longer matches who's actually on the clock for that slot —
- * i.e. the manager roster changed since this draft was played and the saved picks are stale. */
-export function isDraftStale(picks: Pick[]): boolean {
-  return picks.some((p, i) => DRAFT_ORDER[i] !== p.manager);
 }
 
 /** A tie counts as half a win, per standard wins-pool rules. */

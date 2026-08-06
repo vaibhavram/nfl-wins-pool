@@ -1,13 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { RequireAuth } from "@/components/RequireAuth";
 import { TeamLogo } from "@/components/TeamLogo";
 import { useAuth, useDraft } from "@/lib/store";
 import { TEAMS } from "@/lib/teams";
-import { DRAFT_ORDER, TOTAL_PICKS, bestAvailableTeam } from "@/lib/draft";
-
-const AUTO_PICK_DELAY_MS = 500;
+import { DRAFT_ORDER, TOTAL_PICKS } from "@/lib/draft";
 
 function DraftContent() {
   const { manager } = useAuth();
@@ -23,22 +21,17 @@ function DraftContent() {
   } = useDraft();
 
   const myTurn = !draftComplete && onClockManager === manager?.name;
-  const autoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [pickError, setPickError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
-  // Auto-simulate the other 9 managers' picks so the draft keeps moving.
-  useEffect(() => {
-    if (draftComplete || !onClockManager || onClockManager === manager?.name) return;
-    autoTimer.current = setTimeout(() => {
-      const pickTeam = bestAvailableTeam(takenAbs);
-      confirmPick(onClockManager, pickTeam);
-    }, AUTO_PICK_DELAY_MS);
-    return () => {
-      if (autoTimer.current) clearTimeout(autoTimer.current);
-    };
-    // currentPickNo (not just onClockManager) must be a dep: if the draft order ever put the
-    // same manager on the clock for two picks in a row, that transition must still fire.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPickNo, onClockManager, draftComplete, manager?.name]);
+  async function onDraft(teamAb: string) {
+    if (!manager) return;
+    setSubmitting(true);
+    setPickError(null);
+    const result = await confirmPick(manager.token, teamAb);
+    setSubmitting(false);
+    if (!result.ok) setPickError(result.error);
+  }
 
   const round = draftComplete ? 3 : Math.floor((currentPickNo - 1) / 10) + 1;
   const nextManager = !draftComplete && currentPickNo < TOTAL_PICKS ? DRAFT_ORDER[currentPickNo] : null;
@@ -85,10 +78,20 @@ function DraftContent() {
             }}
           />
           <div style={{ flex: 1, fontSize: 14.5, fontFamily: "var(--font-heading)", fontWeight: 500, color: myTurn ? "var(--color-accent-200)" : "var(--color-text)" }}>
-            {myTurn ? "You're on the clock" : `${onClockManager} is picking…`}
+            {myTurn ? "You're on the clock" : `Waiting on ${onClockManager}`}
           </div>
           {nextManager && <div style={{ fontSize: 11.5, color: "var(--color-accent-400)" }}>{nextManager} is next</div>}
         </div>
+        {myTurn && (
+          <div style={{ fontSize: 11.5, lineHeight: 1.4, color: "var(--color-neutral-500)" }}>
+            No time limit — pick whenever you&apos;re ready. Everyone else&apos;s picks show up here as they make them.
+          </div>
+        )}
+        {pickError && (
+          <div style={{ fontSize: 12.5, color: "var(--color-accent-300)", background: "var(--color-accent-900)", border: "1px solid var(--color-accent-700)", borderRadius: "var(--radius-sm)", padding: "8px 10px" }}>
+            {pickError}
+          </div>
+        )}
         <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 2 }} className="scr">
           {DRAFT_ORDER.map((mgr, i) => {
             const pick = picks[i];
@@ -240,12 +243,13 @@ function DraftContent() {
                     <button
                       className="btn btn-primary"
                       style={{ flex: "none", minHeight: 36, paddingInline: 16, fontSize: 13 }}
+                      disabled={submitting}
                       onClick={(e) => {
                         e.stopPropagation();
-                        if (manager) confirmPick(manager.name, tm.ab);
+                        onDraft(tm.ab);
                       }}
                     >
-                      Draft
+                      {submitting ? "Drafting…" : "Draft"}
                     </button>
                   )
                 )}

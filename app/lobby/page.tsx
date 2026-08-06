@@ -5,6 +5,7 @@ import { RequireAuth } from "@/components/RequireAuth";
 import { useAuth, useDraft } from "@/lib/store";
 import { MANAGER_NAMES } from "@/lib/managers";
 import { DRAFT_ORDER } from "@/lib/draft";
+import { usePresence } from "@/lib/live-data";
 
 function pickNumbersFor(name: string): number[] {
   return DRAFT_ORDER.reduce<number[]>((acc, mgr, i) => {
@@ -17,6 +18,7 @@ function LobbyContent() {
   const router = useRouter();
   const { manager, signOut } = useAuth();
   const { picks, draftComplete, resetDraft } = useDraft();
+  const online = usePresence();
 
   const ctaLabel = draftComplete ? "See the leaderboard" : picks.length > 0 ? "Resume the draft" : "Start the draft";
 
@@ -25,8 +27,9 @@ function LobbyContent() {
   }
 
   function onReset() {
+    if (!manager) return;
     if (window.confirm("Reset the draft? Every pick made so far will be cleared for everyone.")) {
-      resetDraft();
+      resetDraft(manager.token);
     }
   }
 
@@ -90,7 +93,19 @@ function LobbyContent() {
                     Picks {pickNumbersFor(name).join(", ")}
                   </div>
                 </div>
-                <div style={{ fontSize: 11.5, color: "var(--color-accent-300)" }}>Ready</div>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, flex: "none" }}>
+                  <div
+                    style={{
+                      width: 6,
+                      height: 6,
+                      borderRadius: "50%",
+                      background: online.has(name) ? "var(--color-accent)" : "var(--color-neutral-700)",
+                    }}
+                  />
+                  <div style={{ fontSize: 11.5, color: online.has(name) ? "var(--color-accent-300)" : "var(--color-neutral-600)" }}>
+                    {online.has(name) ? "Signed in" : "Offline"}
+                  </div>
+                </div>
               </div>
             );
           })}

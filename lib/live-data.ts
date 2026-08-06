@@ -61,3 +61,30 @@ export function useTeamSchedule(abbr: string | null) {
   const { data, loading, error } = useJsonFetch<{ schedule: TeamScheduleRow[] }>(url);
   return { schedule: data?.schedule ?? null, loading, error };
 }
+
+const PRESENCE_POLL_MS = 8000;
+
+/** Who's currently got the app open — same "online" signal the presence heartbeat feeds. */
+export function usePresence() {
+  const [online, setOnline] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    let cancelled = false;
+    const fetchOnce = () => {
+      fetch("/api/presence")
+        .then((res) => res.json())
+        .then((data) => {
+          if (!cancelled) setOnline(new Set(data.online ?? []));
+        })
+        .catch(() => {});
+    };
+    fetchOnce();
+    const id = setInterval(fetchOnce, PRESENCE_POLL_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, []);
+
+  return online;
+}

@@ -2,20 +2,23 @@
 
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
-import { DRAFT_ORDER, TOTAL_PICKS, isDraftStale, type Pick } from "./draft";
+import { DRAFT_ORDER, TOTAL_PICKS, type Pick } from "./draft";
 
 const AUTH_KEY = "nfl-pool-auth";
-const DRAFT_KEY = "nfl-pool-draft";
+const DRAFT_POLL_MS = 4000;
+const HEARTBEAT_MS = 20000;
 
 // ─────────────────────────────────────────── Auth ───────────────────────────────────────────
 
-export type Manager = { name: string };
+export type Manager = { name: string; token: string };
 
 type AuthContextValue = {
   hydrated: boolean;
@@ -48,6 +51,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setInit({ hydrated: true, manager: restored });
   }, []);
 
+  // Presence heartbeat: as long as this manager has the app open somewhere, ping every 20s so
+  // the lobby's "signed in" list reflects who's actually around right now.
+  useEffect(() => {
+    if (!manager) return;
+    const ping = () => {
+      fetch("/api/presence/heartbeat", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${manager.token}` },
+      }).catch(() => {});
+    };
+    ping();
+    const id = setInterval(ping, HEARTBEAT_MS);
+    return () => clearInterval(id);
+  }, [manager]);
+
   async function signIn(phone: string) {
     let res: Response;
     try {
@@ -63,7 +81,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!data.ok) {
       return { ok: false as const, error: data.error ?? "That number isn't on the pool roster." };
     }
-    const found: Manager = { name: data.name };
+    const found: Manager = { name: data.name, token: data.token };
     setManager(found);
     window.localStorage.setItem(AUTH_KEY, JSON.stringify(found));
     return { ok: true as const };
@@ -86,6 +104,11 @@ export function useAuth() {
 }
 
 // ─────────────────────────────────────────── Draft ───────────────────────────────────────────
+// Fully server-authoritative and asynchronous: picks live in Postgres, not localStorage, so
+// every manager's device sees the same draft. Nobody is auto-picked for — a manager's slot just
+// waits, however long it takes, until they submit their own pick from their own device.
+
+type PickResult = { ok: true } | { ok: false; error: string };
 
 type DraftContextValue = {
   hydrated: boolean;
@@ -97,8 +120,9 @@ type DraftContextValue = {
   onClockManager: string | null;
   draftComplete: boolean;
   selectTeam: (ab: string | null) => void;
-  confirmPick: (manager: string, teamAb: string) => void;
-  resetDraft: () => void;
+  confirmPick: (token: string, teamAb: string) => Promise<PickResult>;
+  resetDraft: (token: string) => Promise<void>;
+  refetch: () => void;
 };
 
 const DraftContext = createContext<DraftContextValue | null>(null);
@@ -108,31 +132,38 @@ export function DraftProvider({ children }: { children: ReactNode }) {
     hydrated: false,
     picks: [],
   });
-  const setPicks = (updater: Pick[] | ((prev: Pick[]) => Pick[])) =>
-    setInit((s) => ({ ...s, picks: typeof updater === "function" ? updater(s.picks) : updater }));
   const [selectedTeam, setSelectedTeam] = useState<string | null>(null);
+  const inFlight = useRef(false);
 
-  useEffect(() => {
-    const saved = window.localStorage.getItem(DRAFT_KEY);
-    let restored: Pick[] = [];
-    if (saved) {
-      try {
-        restored = JSON.parse(saved);
-      } catch {
-        // ignore corrupt storage
-      }
+  const fetchState = useCallback(async () => {
+    if (inFlight.current) return;
+    inFlight.current = true;
+    try {
+      const res = await fetch("/api/draft/state");
+      const data = await res.json();
+      setInit({ hydrated: true, picks: data.picks ?? [] });
+    } catch {
+      setInit((s) => ({ ...s, hydrated: true }));
+    } finally {
+      inFlight.current = false;
     }
-    // The manager roster can change (names edited, a real number swapped in) after a draft was
-    // already played; picks that no longer match who's actually on the clock are stale — drop them.
-    if (isDraftStale(restored)) restored = [];
-    // One-time hydration from localStorage; SSR has no window, so this can't be a lazy useState initializer.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setInit({ hydrated: true, picks: restored });
   }, []);
 
   useEffect(() => {
-    if (hydrated) window.localStorage.setItem(DRAFT_KEY, JSON.stringify(picks));
-  }, [picks, hydrated]);
+    // Kicking off the initial poll is the effect synchronizing with the server, same as the
+    // interval/visibility listeners right below it — not deriving state from a render.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchState();
+    const id = setInterval(fetchState, DRAFT_POLL_MS);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") fetchState();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [fetchState]);
 
   const takenAbs = useMemo(() => new Set(picks.map((p) => p.teamAb)), [picks]);
   const currentPickIndex = picks.length < TOTAL_PICKS ? picks.length : -1;
@@ -144,18 +175,30 @@ export function DraftProvider({ children }: { children: ReactNode }) {
     setSelectedTeam(ab);
   }
 
-  function confirmPick(manager: string, teamAb: string) {
-    setPicks((prev) => {
-      if (prev.length >= TOTAL_PICKS) return prev;
-      if (prev.some((p) => p.teamAb === teamAb)) return prev;
-      return [...prev, { pickNo: prev.length + 1, manager, teamAb }];
-    });
-    setSelectedTeam(null);
+  async function confirmPick(token: string, teamAb: string): Promise<PickResult> {
+    try {
+      const res = await fetch("/api/draft/pick", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ teamAb }),
+      });
+      const data = await res.json();
+      if (!data.ok) {
+        fetchState(); // our view of who's on the clock may be stale — resync
+        return { ok: false, error: data.error ?? "Couldn't submit that pick." };
+      }
+      setInit({ hydrated: true, picks: data.picks });
+      setSelectedTeam(null);
+      return { ok: true };
+    } catch {
+      return { ok: false, error: "Couldn't reach the server. Check your connection and try again." };
+    }
   }
 
-  function resetDraft() {
-    setPicks([]);
+  async function resetDraft(token: string) {
+    await fetch("/api/draft/reset", { method: "POST", headers: { Authorization: `Bearer ${token}` } }).catch(() => {});
     setSelectedTeam(null);
+    await fetchState();
   }
 
   const value: DraftContextValue = {
@@ -170,6 +213,7 @@ export function DraftProvider({ children }: { children: ReactNode }) {
     selectTeam,
     confirmPick,
     resetDraft,
+    refetch: fetchState,
   };
 
   return <DraftContext.Provider value={value}>{children}</DraftContext.Provider>;

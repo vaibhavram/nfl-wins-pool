@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { findManagerNameByPhone } from "@/lib/managers-server";
+import { createSessionToken } from "@/lib/session";
 
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null);
@@ -12,5 +13,5 @@ export async function POST(req: NextRequest) {
   if (!name) {
     return NextResponse.json({ ok: false, error: "That number isn't on the pool roster. Ask the commissioner to add you." });
   }
-  return NextResponse.json({ ok: true, name });
+  return NextResponse.json({ ok: true, name, token: createSessionToken(name) });
 }
