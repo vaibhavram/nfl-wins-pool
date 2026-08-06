@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { RequireAuth } from "@/components/RequireAuth";
 import { useAuth, useDraft } from "@/lib/store";
@@ -26,6 +26,12 @@ function LobbyContent() {
     }, []);
   }
 
+  // Everyone gets taken to the draft board automatically the moment the commissioner starts
+  // it — nobody needs to click a "Resume" button, they just land there.
+  useEffect(() => {
+    if (started && !draftComplete) router.push("/draft");
+  }, [started, draftComplete, router]);
+
   async function onStart() {
     if (!manager) return;
     setBusy(true);
@@ -34,10 +40,6 @@ function LobbyContent() {
     setBusy(false);
     if (result.ok) router.push("/draft");
     else setError(result.error);
-  }
-
-  function onResume() {
-    router.push(draftComplete ? "/leaderboard" : "/draft");
   }
 
   function onReset() {
@@ -136,10 +138,24 @@ function LobbyContent() {
           gap: 8,
         }}
       >
-        {started || draftComplete ? (
-          <button className="btn btn-primary btn-block" style={{ minHeight: 48, fontSize: 15, marginTop: 0 }} onClick={onResume}>
-            {draftComplete ? "See the leaderboard" : "Resume the draft"}
+        {draftComplete ? (
+          <button className="btn btn-primary btn-block" style={{ minHeight: 48, fontSize: 15, marginTop: 0 }} onClick={() => router.push("/leaderboard")}>
+            See the leaderboard
           </button>
+        ) : started ? (
+          <div
+            style={{
+              textAlign: "center",
+              padding: "13px 12px",
+              borderRadius: "var(--radius-md)",
+              border: "1px solid var(--color-accent-700)",
+              background: "var(--color-accent-900)",
+              fontSize: 14,
+              color: "var(--color-accent-200)",
+            }}
+          >
+            Draft started — taking you there…
+          </div>
         ) : iAmCommissioner ? (
           <button className="btn btn-primary btn-block" style={{ minHeight: 48, fontSize: 15, marginTop: 0 }} onClick={onStart} disabled={busy}>
             {busy ? "Starting…" : "Start the draft"}
