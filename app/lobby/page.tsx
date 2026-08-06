@@ -73,7 +73,7 @@ function LobbyContent() {
           Draft order
         </div>
         <div style={{ fontSize: 13.5, lineHeight: 1.5, color: "var(--color-accent-200)" }}>
-          Each draft position below gets 3 picks, spread across the board (e.g. 1st, 28th, and 30th overall) instead of a
+          Each draft position below gets 3 picks, spread across the board (e.g. 1st, 20th, and 26th overall) instead of a
           straight snake — so no position is systematically stronger.
         </div>
       </div>

@@ -3,7 +3,7 @@
 A private pool for 10 friends: each manager drafts 3 NFL teams, and whoever's
 three teams combine for the most regular-season wins takes the pool. Draft
 order isn't a straight snake — each position gets 3 picks spread across the
-board (the "Eldorado method") so no slot is systematically stronger.
+board (the Bill Simmons / Grantland method) so no slot is systematically stronger.
 
 Live at **nfl-wins.vaibhavramamoorthy.com**.
 
