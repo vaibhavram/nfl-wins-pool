@@ -1,9 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { RequireAuth } from "@/components/RequireAuth";
 import { useAuth, useDraft } from "@/lib/store";
-import { MANAGER_NAMES } from "@/lib/managers";
+import { MANAGER_NAMES, COMMISSIONER, isCommissioner } from "@/lib/managers";
 import { DRAFT_ORDER } from "@/lib/draft";
 import { usePresence } from "@/lib/live-data";
 
@@ -17,12 +18,24 @@ function pickNumbersFor(name: string): number[] {
 function LobbyContent() {
   const router = useRouter();
   const { manager, signOut } = useAuth();
-  const { picks, draftComplete, resetDraft } = useDraft();
+  const { picks, started, draftComplete, startDraft, resetDraft } = useDraft();
   const online = usePresence();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const ctaLabel = draftComplete ? "See the leaderboard" : picks.length > 0 ? "Resume the draft" : "Start the draft";
+  const iAmCommissioner = isCommissioner(manager?.name);
 
-  function onCta() {
+  async function onStart() {
+    if (!manager) return;
+    setBusy(true);
+    setError(null);
+    const result = await startDraft(manager.token);
+    setBusy(false);
+    if (result.ok) router.push("/draft");
+    else setError(result.error);
+  }
+
+  function onResume() {
     router.push(draftComplete ? "/leaderboard" : "/draft");
   }
 
@@ -122,11 +135,31 @@ function LobbyContent() {
           gap: 8,
         }}
       >
-        <button className="btn btn-primary btn-block" style={{ minHeight: 48, fontSize: 15, marginTop: 0 }} onClick={onCta}>
-          {ctaLabel}
-        </button>
+        {started || draftComplete ? (
+          <button className="btn btn-primary btn-block" style={{ minHeight: 48, fontSize: 15, marginTop: 0 }} onClick={onResume}>
+            {draftComplete ? "See the leaderboard" : "Resume the draft"}
+          </button>
+        ) : iAmCommissioner ? (
+          <button className="btn btn-primary btn-block" style={{ minHeight: 48, fontSize: 15, marginTop: 0 }} onClick={onStart} disabled={busy}>
+            {busy ? "Starting…" : "Start the draft"}
+          </button>
+        ) : (
+          <div
+            style={{
+              textAlign: "center",
+              padding: "13px 12px",
+              borderRadius: "var(--radius-md)",
+              border: "1px solid var(--color-divider)",
+              fontSize: 14,
+              color: "var(--color-neutral-500)",
+            }}
+          >
+            Waiting for {COMMISSIONER} to start the draft
+          </div>
+        )}
+        {error && <div style={{ fontSize: 12.5, color: "var(--color-accent-300)", textAlign: "center" }}>{error}</div>}
         <div style={{ display: "flex", justifyContent: "center", gap: 16 }}>
-          {picks.length > 0 && (
+          {iAmCommissioner && (started || picks.length > 0) && (
             <button className="btn btn-ghost" style={{ fontSize: 12.5 }} onClick={onReset}>
               Reset draft
             </button>

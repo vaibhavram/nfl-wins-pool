@@ -13,3 +13,10 @@ export const MANAGER_NAMES: string[] = [
   "Leo",
   "Advait",
 ];
+
+/** Only the commissioner can start or reset the draft. */
+export const COMMISSIONER = "Vaibhav";
+
+export function isCommissioner(name: string | null | undefined): boolean {
+  return name === COMMISSIONER;
+}

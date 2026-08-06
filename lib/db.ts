@@ -18,6 +18,11 @@ function ensureSchema(): Promise<void> {
         manager TEXT PRIMARY KEY,
         last_seen TIMESTAMPTZ NOT NULL DEFAULT now()
       );
+      CREATE TABLE IF NOT EXISTS draft_meta (
+        id INTEGER PRIMARY KEY DEFAULT 1,
+        started_at TIMESTAMPTZ,
+        CHECK (id = 1)
+      );
     `).then(() => undefined);
   }
   return schemaReady;

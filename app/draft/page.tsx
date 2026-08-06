@@ -1,15 +1,20 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { RequireAuth } from "@/components/RequireAuth";
 import { TeamLogo } from "@/components/TeamLogo";
 import { useAuth, useDraft } from "@/lib/store";
 import { TEAMS } from "@/lib/teams";
+import { COMMISSIONER } from "@/lib/managers";
 import { DRAFT_ORDER, TOTAL_PICKS } from "@/lib/draft";
 
 function DraftContent() {
+  const router = useRouter();
   const { manager } = useAuth();
   const {
+    hydrated,
+    started,
     picks,
     selectedTeam,
     takenAbs,
@@ -23,6 +28,18 @@ function DraftContent() {
   const myTurn = !draftComplete && onClockManager === manager?.name;
   const [pickError, setPickError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [sortMode, setSortMode] = useState<"alpha" | "ou">("alpha");
+  const [hideDrafted, setHideDrafted] = useState(false);
+
+  const round = draftComplete ? 3 : Math.floor((currentPickNo - 1) / 10) + 1;
+  const nextManager = !draftComplete && currentPickNo < TOTAL_PICKS ? DRAFT_ORDER[currentPickNo] : null;
+
+  const sortedTeams = useMemo(() => {
+    const list = hideDrafted ? TEAMS.filter((t) => !takenAbs.has(t.ab)) : TEAMS;
+    return [...list].sort((a, b) =>
+      sortMode === "ou" ? b.ou - a.ou || a.city.localeCompare(b.city) : a.city.localeCompare(b.city),
+    );
+  }, [sortMode, hideDrafted, takenAbs]);
 
   async function onDraft(teamAb: string) {
     if (!manager) return;
@@ -33,18 +50,21 @@ function DraftContent() {
     if (!result.ok) setPickError(result.error);
   }
 
-  const round = draftComplete ? 3 : Math.floor((currentPickNo - 1) / 10) + 1;
-  const nextManager = !draftComplete && currentPickNo < TOTAL_PICKS ? DRAFT_ORDER[currentPickNo] : null;
-
-  const [sortMode, setSortMode] = useState<"alpha" | "ou">("alpha");
-  const [hideDrafted, setHideDrafted] = useState(false);
-
-  const sortedTeams = useMemo(() => {
-    const list = hideDrafted ? TEAMS.filter((t) => !takenAbs.has(t.ab)) : TEAMS;
-    return [...list].sort((a, b) =>
-      sortMode === "ou" ? b.ou - a.ou || a.city.localeCompare(b.city) : a.city.localeCompare(b.city),
+  // Direct-URL edge case: someone visits /draft before the commissioner has started it.
+  // Gated on `hydrated` so this doesn't flash for a moment on every load before the first fetch resolves.
+  if (hydrated && !started && !draftComplete) {
+    return (
+      <div className="app-shell" style={{ justifyContent: "center", alignItems: "center", gap: 14, padding: 28, textAlign: "center" }}>
+        <h3 style={{ margin: 0 }}>Not started yet</h3>
+        <p style={{ margin: 0, color: "var(--color-neutral-500)", maxWidth: "32ch" }}>
+          Waiting for {COMMISSIONER} to start the draft.
+        </p>
+        <button className="btn btn-secondary" onClick={() => router.push("/lobby")}>
+          Back to lobby
+        </button>
+      </div>
     );
-  }, [sortMode, hideDrafted, takenAbs]);
+  }
 
   return (
     <div className="app-shell">

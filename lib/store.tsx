@@ -112,6 +112,7 @@ type PickResult = { ok: true } | { ok: false; error: string };
 
 type DraftContextValue = {
   hydrated: boolean;
+  started: boolean;
   picks: Pick[];
   selectedTeam: string | null;
   takenAbs: Set<string>;
@@ -121,15 +122,19 @@ type DraftContextValue = {
   draftComplete: boolean;
   selectTeam: (ab: string | null) => void;
   confirmPick: (token: string, teamAb: string) => Promise<PickResult>;
+  startDraft: (token: string) => Promise<PickResult>;
   resetDraft: (token: string) => Promise<void>;
   refetch: () => void;
 };
 
 const DraftContext = createContext<DraftContextValue | null>(null);
 
+type DraftState = { hydrated: boolean; started: boolean; picks: Pick[] };
+
 export function DraftProvider({ children }: { children: ReactNode }) {
-  const [{ hydrated, picks }, setInit] = useState<{ hydrated: boolean; picks: Pick[] }>({
+  const [{ hydrated, started, picks }, setInit] = useState<DraftState>({
     hydrated: false,
+    started: false,
     picks: [],
   });
   const [selectedTeam, setSelectedTeam] = useState<string | null>(null);
@@ -141,7 +146,7 @@ export function DraftProvider({ children }: { children: ReactNode }) {
     try {
       const res = await fetch("/api/draft/state");
       const data = await res.json();
-      setInit({ hydrated: true, picks: data.picks ?? [] });
+      setInit({ hydrated: true, started: Boolean(data.started), picks: data.picks ?? [] });
     } catch {
       setInit((s) => ({ ...s, hydrated: true }));
     } finally {
@@ -187,8 +192,20 @@ export function DraftProvider({ children }: { children: ReactNode }) {
         fetchState(); // our view of who's on the clock may be stale — resync
         return { ok: false, error: data.error ?? "Couldn't submit that pick." };
       }
-      setInit({ hydrated: true, picks: data.picks });
+      setInit((s) => ({ ...s, hydrated: true, picks: data.picks }));
       setSelectedTeam(null);
+      return { ok: true };
+    } catch {
+      return { ok: false, error: "Couldn't reach the server. Check your connection and try again." };
+    }
+  }
+
+  async function startDraft(token: string): Promise<PickResult> {
+    try {
+      const res = await fetch("/api/draft/start", { method: "POST", headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      if (!data.ok) return { ok: false, error: data.error ?? "Couldn't start the draft." };
+      await fetchState();
       return { ok: true };
     } catch {
       return { ok: false, error: "Couldn't reach the server. Check your connection and try again." };
@@ -203,6 +220,7 @@ export function DraftProvider({ children }: { children: ReactNode }) {
 
   const value: DraftContextValue = {
     hydrated,
+    started,
     picks,
     selectedTeam,
     takenAbs,
@@ -212,6 +230,7 @@ export function DraftProvider({ children }: { children: ReactNode }) {
     draftComplete,
     selectTeam,
     confirmPick,
+    startDraft,
     resetDraft,
     refetch: fetchState,
   };
