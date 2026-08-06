@@ -11,12 +11,13 @@ import { buildDraftOrder, TOTAL_PICKS } from "@/lib/draft";
 
 function formatRemaining(deadline: string | null, now: number): string | null {
   if (!deadline) return null;
-  const ms = new Date(deadline).getTime() - now;
-  if (ms <= 0) return "moments";
-  const totalMin = Math.ceil(ms / 60000);
-  const h = Math.floor(totalMin / 60);
-  const m = totalMin % 60;
-  return h > 0 ? `${h}h ${m}m` : `${m}m`;
+  const ms = Math.max(0, new Date(deadline).getTime() - now);
+  const totalSec = Math.floor(ms / 1000);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(h)}:${pad(m)}:${pad(s)}`;
 }
 
 function DraftContent() {
@@ -123,10 +124,9 @@ function DraftContent() {
           {nextManager && <div style={{ fontSize: 11.5, color: "var(--color-accent-400)" }}>{nextManager} is next</div>}
         </div>
         {remaining && !draftComplete && (
-          <div style={{ fontSize: 11.5, lineHeight: 1.4, color: "var(--color-neutral-500)" }}>
-            {myTurn
-              ? `Pick whenever you're ready — after ${remaining}, the highest O/U team gets drafted for you automatically.`
-              : `Auto-picks for ${onClockManager} in ${remaining} if they haven't picked by then.`}
+          <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11.5, color: "var(--color-neutral-500)" }}>
+            <span>Auto-pick in</span>
+            <span style={{ fontFamily: "ui-monospace,monospace", fontSize: 12, color: "var(--color-neutral-400)" }}>{remaining}</span>
           </div>
         )}
         {pickError && (
