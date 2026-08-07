@@ -74,7 +74,16 @@ function LobbyContent() {
         </div>
         <div style={{ fontSize: 13.5, lineHeight: 1.5, color: "var(--color-accent-200)" }}>
           Each draft position below gets 3 picks, spread across the board (e.g. 1st, 20th, and 26th overall) instead of a
-          straight snake — so no position is systematically stronger.
+          straight snake — so no position is systematically stronger. From{" "}
+          <a
+            href="https://grantland.com/the-triangle/you-should-have-an-nfl-wins-pool/"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: "var(--color-accent-300)", textDecoration: "underline" }}
+          >
+            the original Grantland pitch
+          </a>
+          .
         </div>
       </div>
       <div style={{ flex: 1, overflow: "auto", padding: "0 20px 16px" }} className="scr">
