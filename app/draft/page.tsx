@@ -8,6 +8,7 @@ import { useAuth, useDraft } from "@/lib/store";
 import { TEAMS } from "@/lib/teams";
 import { COMMISSIONER } from "@/lib/managers";
 import { buildDraftOrder, TOTAL_PICKS } from "@/lib/draft";
+import { ODDS_SOURCES, computeGrades } from "@/lib/odds-sources";
 
 function formatRemaining(deadline: string | null, now: number): string | null {
   if (!deadline) return null;
@@ -43,6 +44,7 @@ function DraftContent() {
   const [submitting, setSubmitting] = useState(false);
   const [sortMode, setSortMode] = useState<"alpha" | "ou">("alpha");
   const [hideDrafted, setHideDrafted] = useState(false);
+  const [view, setView] = useState<"board" | "grades">("board");
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
@@ -61,6 +63,8 @@ function DraftContent() {
       sortMode === "ou" ? b.ou - a.ou || a.city.localeCompare(b.city) : a.city.localeCompare(b.city),
     );
   }, [sortMode, hideDrafted, takenAbs]);
+
+  const grades = useMemo(() => computeGrades(picks), [picks]);
 
   async function onDraft(teamAb: string) {
     if (!manager) return;
@@ -194,47 +198,120 @@ function DraftContent() {
       </div>
 
       <div style={{ flex: 1, overflow: "auto", padding: "10px 14px 12px" }} className="scr">
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, gap: 8 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <div style={{ fontSize: 11.5, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--color-neutral-600)" }}>Sort by</div>
-            <div style={{ display: "inline-flex", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-sm)", overflow: "hidden" }}>
-              {(["alpha", "ou"] as const).map((mode) => (
+        <div style={{ display: "inline-flex", marginBottom: 12, border: "1px solid var(--color-divider)", borderRadius: "var(--radius-sm)", overflow: "hidden" }}>
+          {(["board", "grades"] as const).map((v) => (
+            <button
+              key={v}
+              onClick={() => setView(v)}
+              style={{
+                border: "none",
+                cursor: "pointer",
+                padding: "7px 14px",
+                fontSize: 12.5,
+                fontFamily: "var(--font-heading)",
+                fontWeight: 500,
+                background: view === v ? "var(--color-accent-900)" : "transparent",
+                color: view === v ? "var(--color-accent-200)" : "var(--color-neutral-500)",
+              }}
+            >
+              {v === "board" ? "Draft board" : "Grades"}
+            </button>
+          ))}
+        </div>
+
+        {view === "grades" ? (
+          <div>
+            <div style={{ fontSize: 11.5, lineHeight: 1.5, color: "var(--color-neutral-600)", marginBottom: 10 }}>
+              Each manager&apos;s drafted teams&apos; preseason win-total lines, summed per source. Not final until everyone has all 3 picks.
+            </div>
+            <div style={{ overflowX: "auto" }} className="scr">
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
+                <thead>
+                  <tr>
+                    <th style={{ textAlign: "left", padding: "6px 8px 6px 0", fontSize: 10.5, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--color-neutral-600)" }}>Manager</th>
+                    {ODDS_SOURCES.map((s) => (
+                      <th key={s} style={{ textAlign: "right", padding: "6px 8px", fontSize: 10.5, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--color-neutral-600)", whiteSpace: "nowrap" }}>
+                        {s}
+                      </th>
+                    ))}
+                    <th style={{ textAlign: "right", padding: "6px 0 6px 8px", fontSize: 10.5, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--color-neutral-600)" }}>Avg</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {grades.map((g, i) => {
+                    const isMine = g.manager === manager?.name;
+                    return (
+                      <tr
+                        key={g.manager}
+                        style={{
+                          background: isMine ? "var(--color-accent-900)" : i % 2 === 0 ? "var(--color-surface)" : "transparent",
+                        }}
+                      >
+                        <td style={{ padding: "8px 8px 8px 0", whiteSpace: "nowrap" }}>
+                          <span style={{ color: "var(--color-neutral-600)", fontFamily: "ui-monospace,monospace", marginRight: 6 }}>{i + 1}</span>
+                          <span style={{ color: isMine ? "var(--color-accent-200)" : "var(--color-text)" }}>{g.manager}</span>
+                          {g.teams.length < 3 && (
+                            <span style={{ marginLeft: 6, fontSize: 10.5, color: "var(--color-neutral-600)" }}>({g.teams.length}/3)</span>
+                          )}
+                        </td>
+                        {ODDS_SOURCES.map((s) => (
+                          <td key={s} style={{ textAlign: "right", padding: "8px", fontFamily: "ui-monospace,monospace", color: "var(--color-neutral-400)" }}>
+                            {g.bySource[s]}
+                          </td>
+                        ))}
+                        <td style={{ textAlign: "right", padding: "8px 0 8px 8px", fontFamily: "ui-monospace,monospace", fontWeight: 700, color: "var(--color-accent-300)" }}>
+                          {g.avg.toFixed(2)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, gap: 8 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <div style={{ fontSize: 11.5, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--color-neutral-600)" }}>Sort by</div>
+                <div style={{ display: "inline-flex", border: "1px solid var(--color-divider)", borderRadius: "var(--radius-sm)", overflow: "hidden" }}>
+                  {(["alpha", "ou"] as const).map((mode) => (
+                    <button
+                      key={mode}
+                      onClick={() => setSortMode(mode)}
+                      style={{
+                        border: "none",
+                        cursor: "pointer",
+                        padding: "5px 10px",
+                        fontSize: 11,
+                        fontFamily: "var(--font-body)",
+                        background: sortMode === mode ? "var(--color-accent-900)" : "transparent",
+                        color: sortMode === mode ? "var(--color-accent-200)" : "var(--color-neutral-500)",
+                      }}
+                    >
+                      {mode === "alpha" ? "A–Z" : "O/U"}
+                    </button>
+                  ))}
+                </div>
                 <button
-                  key={mode}
-                  onClick={() => setSortMode(mode)}
+                  onClick={() => setHideDrafted((v) => !v)}
                   style={{
-                    border: "none",
+                    border: `1px solid ${hideDrafted ? "var(--color-accent)" : "var(--color-divider)"}`,
+                    borderRadius: "var(--radius-sm)",
                     cursor: "pointer",
                     padding: "5px 10px",
                     fontSize: 11,
                     fontFamily: "var(--font-body)",
-                    background: sortMode === mode ? "var(--color-accent-900)" : "transparent",
-                    color: sortMode === mode ? "var(--color-accent-200)" : "var(--color-neutral-500)",
+                    background: hideDrafted ? "var(--color-accent-900)" : "transparent",
+                    color: hideDrafted ? "var(--color-accent-200)" : "var(--color-neutral-500)",
                   }}
                 >
-                  {mode === "alpha" ? "A–Z" : "O/U"}
+                  Hide drafted
                 </button>
-              ))}
+              </div>
             </div>
-            <button
-              onClick={() => setHideDrafted((v) => !v)}
-              style={{
-                border: `1px solid ${hideDrafted ? "var(--color-accent)" : "var(--color-divider)"}`,
-                borderRadius: "var(--radius-sm)",
-                cursor: "pointer",
-                padding: "5px 10px",
-                fontSize: 11,
-                fontFamily: "var(--font-body)",
-                background: hideDrafted ? "var(--color-accent-900)" : "transparent",
-                color: hideDrafted ? "var(--color-accent-200)" : "var(--color-neutral-500)",
-              }}
-            >
-              Hide drafted
-            </button>
-          </div>
-        </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          {sortedTeams.map((tm) => {
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {sortedTeams.map((tm) => {
             const isTaken = takenAbs.has(tm.ab);
             const takenBy = isTaken ? picks.find((p) => p.teamAb === tm.ab)?.manager : null;
             const isSel = selectedTeam === tm.ab;
@@ -298,7 +375,9 @@ function DraftContent() {
               </div>
             );
           })}
-        </div>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
