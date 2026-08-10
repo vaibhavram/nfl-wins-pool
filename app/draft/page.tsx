@@ -227,7 +227,7 @@ function DraftContent() {
             <div style={{ overflowX: "auto" }} className="scr">
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, tableLayout: "fixed" }}>
                 <colgroup>
-                  <col style={{ width: "auto" }} />
+                  <col style={{ width: 78 }} />
                   {ODDS_SOURCES.map((s) => (
                     <col key={s} style={{ width: 46 }} />
                   ))}
@@ -254,12 +254,16 @@ function DraftContent() {
                           background: isMine ? "var(--color-accent-900)" : i % 2 === 0 ? "var(--color-surface)" : "transparent",
                         }}
                       >
-                        <td style={{ padding: "7px 4px 7px 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                          <span style={{ color: "var(--color-neutral-600)", fontFamily: "ui-monospace,monospace", fontSize: 10.5, marginRight: 4 }}>{i + 1}</span>
-                          <span style={{ color: isMine ? "var(--color-accent-200)" : "var(--color-text)" }}>{g.manager}</span>
-                          {g.teams.length < 3 && (
-                            <span style={{ marginLeft: 4, fontSize: 10, color: "var(--color-neutral-600)" }}>({g.teams.length}/3)</span>
-                          )}
+                        <td style={{ padding: "7px 4px 7px 0" }}>
+                          <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            <span style={{ color: "var(--color-neutral-600)", fontFamily: "ui-monospace,monospace", fontSize: 10.5, marginRight: 4 }}>{i + 1}</span>
+                            <span style={{ color: isMine ? "var(--color-accent-200)" : "var(--color-text)" }}>{g.manager}</span>
+                          </div>
+                          <div style={{ display: "flex", gap: 2, marginTop: 3 }}>
+                            {g.teams.map((ab) => (
+                              <TeamLogo key={ab} ab={ab} size={14} />
+                            ))}
+                          </div>
                         </td>
                         {ODDS_SOURCES.map((s) => (
                           <td key={s} style={{ textAlign: "right", padding: "7px 4px", fontFamily: "ui-monospace,monospace", fontSize: 11.5, color: "var(--color-neutral-400)" }}>
