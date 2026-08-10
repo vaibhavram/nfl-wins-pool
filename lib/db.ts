@@ -27,6 +27,23 @@ function ensureSchema(): Promise<void> {
         position INTEGER PRIMARY KEY,
         manager TEXT NOT NULL
       );
+      -- Append-only audit log: application code only ever INSERTs here, never UPDATEs or
+      -- DELETEs, so it survives a draft reset even though draft_picks itself gets wiped.
+      CREATE TABLE IF NOT EXISTS draft_events (
+        id SERIAL PRIMARY KEY,
+        event_type TEXT NOT NULL,
+        pick_no INTEGER,
+        manager TEXT,
+        team_ab TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+      );
+      -- One-time, idempotent backfill of picks that were already made before this log existed.
+      INSERT INTO draft_events (event_type, pick_no, manager, team_ab, created_at)
+      SELECT 'pick', dp.pick_no, dp.manager, dp.team_ab, dp.created_at
+      FROM draft_picks dp
+      WHERE NOT EXISTS (
+        SELECT 1 FROM draft_events de WHERE de.event_type = 'pick' AND de.pick_no = dp.pick_no
+      );
     `).then(() => undefined);
   }
   return schemaReady;

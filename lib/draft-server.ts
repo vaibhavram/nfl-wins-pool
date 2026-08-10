@@ -21,11 +21,56 @@ export async function isDraftStarted(): Promise<boolean> {
   return Boolean(rows[0]?.started_at);
 }
 
+/** Append-only audit trail — application code only ever inserts here, so it survives a
+ * draft_picks wipe and can be used to manually reconstruct history if a reset ever happens
+ * by accident. */
+async function logEvent(
+  eventType: "start" | "reset" | "pick" | "auto_pick",
+  fields: { pickNo?: number; manager?: string; teamAb?: string } = {},
+): Promise<void> {
+  await query("INSERT INTO draft_events (event_type, pick_no, manager, team_ab) VALUES ($1, $2, $3, $4)", [
+    eventType,
+    fields.pickNo ?? null,
+    fields.manager ?? null,
+    fields.teamAb ?? null,
+  ]);
+}
+
+export type DraftEvent = {
+  id: number;
+  eventType: string;
+  pickNo: number | null;
+  manager: string | null;
+  teamAb: string | null;
+  createdAt: string;
+};
+
+/** Full history, including anything wiped from draft_picks by a since-happened reset. */
+export async function getEventLog(): Promise<DraftEvent[]> {
+  const rows = await query<{
+    id: number;
+    event_type: string;
+    pick_no: number | null;
+    manager: string | null;
+    team_ab: string | null;
+    created_at: string;
+  }>("SELECT id, event_type, pick_no, manager, team_ab, created_at FROM draft_events ORDER BY id ASC");
+  return rows.map((r) => ({
+    id: r.id,
+    eventType: r.event_type,
+    pickNo: r.pick_no,
+    manager: r.manager,
+    teamAb: r.team_ab,
+    createdAt: r.created_at,
+  }));
+}
+
 export async function startDraft(): Promise<void> {
   await query(
     `INSERT INTO draft_meta (id, started_at) VALUES (1, now())
      ON CONFLICT (id) DO UPDATE SET started_at = now()`,
   );
+  await logEvent("start");
 }
 
 /** Fisher-Yates using crypto.randomInt — same approach used to pick the very first draft order. */
@@ -116,6 +161,7 @@ async function resolveOverduePicks(): Promise<void> {
       if ((err as { code?: string }).code === "23505") continue; // someone else's request just filled it
       throw err;
     }
+    await logEvent("auto_pick", { pickNo, manager: onClock, teamAb });
     // loop: the next slot may *also* be overdue after a long absence
   }
 }
@@ -153,6 +199,7 @@ export async function submitPick(manager: string, teamAb: string): Promise<Submi
     }
     throw err;
   }
+  await logEvent("pick", { pickNo, manager, teamAb });
   return { ok: true, ...(await getFullState()) };
 }
 
@@ -177,8 +224,10 @@ export async function getFullState(): Promise<DraftStatePayload> {
   return { picks, started, order, deadline };
 }
 
-/** Wipes picks, un-starts the draft, and reshuffles who holds which draft position. */
+/** Wipes picks, un-starts the draft, and reshuffles who holds which draft position. The wiped
+ * picks stay recoverable in draft_events — this only clears the *live* tables. */
 export async function resetPicks(): Promise<void> {
+  await logEvent("reset");
   await query("DELETE FROM draft_picks");
   await query("DELETE FROM draft_meta");
   await savePositionOrder(shuffle(MANAGER_NAMES));
