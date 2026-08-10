@@ -221,63 +221,96 @@ function DraftContent() {
 
         {view === "grades" ? (
           <div>
-            <div style={{ fontSize: 11.5, lineHeight: 1.5, color: "var(--color-neutral-600)", marginBottom: 10 }}>
+            <div style={{ fontSize: 11.5, lineHeight: 1.5, color: "var(--color-neutral-600)", marginBottom: 12 }}>
               Each manager&apos;s drafted teams&apos; preseason win-total lines, summed per source. Not final until everyone has all 3 picks.
             </div>
-            <div style={{ overflowX: "auto" }} className="scr">
-              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, tableLayout: "fixed" }}>
-                <colgroup>
-                  <col style={{ width: 78 }} />
-                  {ODDS_SOURCES.map((s) => (
-                    <col key={s} style={{ width: 46 }} />
-                  ))}
-                  <col style={{ width: 50 }} />
-                </colgroup>
-                <thead>
-                  <tr>
-                    <th style={{ textAlign: "left", padding: "6px 4px 6px 0", fontSize: 10, letterSpacing: ".04em", textTransform: "uppercase", color: "var(--color-neutral-600)" }}>Manager</th>
+            <div
+              style={{
+                border: "1px solid var(--color-divider)",
+                borderRadius: "var(--radius-md)",
+                overflow: "hidden",
+                background: "var(--color-surface)",
+              }}
+            >
+              <div style={{ overflowX: "auto" }} className="scr">
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, tableLayout: "fixed", minWidth: 320 }}>
+                  <colgroup>
+                    <col style={{ width: 84 }} />
                     {ODDS_SOURCES.map((s) => (
-                      <th key={s} style={{ textAlign: "right", padding: "6px 4px", fontSize: 10, letterSpacing: ".02em", textTransform: "uppercase", color: "var(--color-neutral-600)", whiteSpace: "nowrap" }}>
-                        {s === "DraftKings" ? "DK" : s === "BetMGM" ? "MGM" : s}
-                      </th>
+                      <col key={s} style={{ width: 44 }} />
                     ))}
-                    <th style={{ textAlign: "right", padding: "6px 0 6px 4px", fontSize: 10, letterSpacing: ".04em", textTransform: "uppercase", color: "var(--color-neutral-600)" }}>Avg</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {grades.map((g, i) => {
-                    const isMine = g.manager === manager?.name;
-                    return (
-                      <tr
-                        key={g.manager}
-                        style={{
-                          background: isMine ? "var(--color-accent-900)" : i % 2 === 0 ? "var(--color-surface)" : "transparent",
-                        }}
-                      >
-                        <td style={{ padding: "7px 4px 7px 0" }}>
-                          <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                            <span style={{ color: "var(--color-neutral-600)", fontFamily: "ui-monospace,monospace", fontSize: 10.5, marginRight: 4 }}>{i + 1}</span>
-                            <span style={{ color: isMine ? "var(--color-accent-200)" : "var(--color-text)" }}>{g.manager}</span>
-                          </div>
-                          <div style={{ display: "flex", gap: 2, marginTop: 3 }}>
-                            {g.teams.map((ab) => (
-                              <TeamLogo key={ab} ab={ab} size={14} />
-                            ))}
-                          </div>
-                        </td>
-                        {ODDS_SOURCES.map((s) => (
-                          <td key={s} style={{ textAlign: "right", padding: "7px 4px", fontFamily: "ui-monospace,monospace", fontSize: 11.5, color: "var(--color-neutral-400)" }}>
-                            {g.bySource[s]}
+                    <col style={{ width: 54 }} />
+                  </colgroup>
+                  <thead>
+                    <tr style={{ background: "var(--color-neutral-900)" }}>
+                      <th style={{ textAlign: "left", padding: "8px 4px 8px 12px", fontSize: 10, letterSpacing: ".06em", textTransform: "uppercase", fontFamily: "var(--font-heading)", color: "var(--color-neutral-500)", borderBottom: "1px solid var(--color-divider)" }}>
+                        Manager
+                      </th>
+                      {ODDS_SOURCES.map((s) => (
+                        <th
+                          key={s}
+                          style={{ textAlign: "right", padding: "8px 4px", fontSize: 10, letterSpacing: ".04em", textTransform: "uppercase", fontFamily: "var(--font-heading)", color: "var(--color-neutral-500)", whiteSpace: "nowrap", borderBottom: "1px solid var(--color-divider)" }}
+                        >
+                          {s === "DraftKings" ? "DK" : s === "BetMGM" ? "MGM" : s}
+                        </th>
+                      ))}
+                      <th style={{ textAlign: "right", padding: "8px 12px 8px 4px", fontSize: 10, letterSpacing: ".06em", textTransform: "uppercase", fontFamily: "var(--font-heading)", color: "var(--color-neutral-500)", borderBottom: "1px solid var(--color-divider)" }}>
+                        Avg
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {grades.map((g, i) => {
+                      const isMine = g.manager === manager?.name;
+                      const isLeader = i === 0;
+                      const isLast = i === grades.length - 1;
+                      return (
+                        <tr
+                          key={g.manager}
+                          style={{
+                            background: isMine ? "var(--color-accent-900)" : "transparent",
+                            borderBottom: isLast ? "none" : "1px solid var(--color-divider)",
+                          }}
+                        >
+                          <td style={{ padding: "9px 4px 9px 12px" }}>
+                            <div style={{ display: "flex", alignItems: "baseline", gap: 5 }}>
+                              <span style={{ flex: "none", fontFamily: "ui-monospace,monospace", fontSize: 10.5, color: isLeader ? "var(--color-accent-300)" : "var(--color-neutral-600)" }}>
+                                {i + 1}
+                              </span>
+                              <span
+                                style={{
+                                  fontSize: 12.5,
+                                  color: isMine ? "var(--color-accent-200)" : "var(--color-text)",
+                                  whiteSpace: "nowrap",
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                }}
+                              >
+                                {g.manager}
+                              </span>
+                            </div>
+                            <div style={{ display: "flex", gap: 3, marginTop: 4 }}>
+                              {g.teams.map((ab) => (
+                                <TeamLogo key={ab} ab={ab} size={15} />
+                              ))}
+                            </div>
                           </td>
-                        ))}
-                        <td style={{ textAlign: "right", padding: "7px 0 7px 4px", fontFamily: "ui-monospace,monospace", fontWeight: 700, color: "var(--color-accent-300)" }}>
-                          {g.avg.toFixed(1)}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                          {ODDS_SOURCES.map((s) => (
+                            <td key={s} style={{ textAlign: "right", padding: "9px 4px", fontFamily: "ui-monospace,monospace", fontSize: 11.5, color: "var(--color-neutral-400)" }}>
+                              {g.bySource[s]}
+                            </td>
+                          ))}
+                          <td style={{ textAlign: "right", padding: "9px 12px 9px 4px" }}>
+                            <span style={{ fontFamily: "var(--font-heading)", fontSize: 16, fontWeight: 600, color: isLeader ? "var(--color-accent-300)" : "var(--color-accent-400)" }}>
+                              {g.avg.toFixed(1)}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         ) : (
