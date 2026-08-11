@@ -73,7 +73,10 @@ export default function LeaderboardPage() {
                   {idx + 1}
                 </div>
                 <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, minWidth: 0 }}>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 1, minWidth: 0 }}>
+                  <div
+                    onClick={() => router.push(`/manager/${encodeURIComponent(r.name)}`)}
+                    style={{ display: "flex", flexDirection: "column", gap: 1, minWidth: 0, cursor: "pointer" }}
+                  >
                     <div style={{ fontSize: 14.5, color: "var(--color-text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                       {r.name}
                       {mine && " (you)"}
