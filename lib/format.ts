@@ -1,7 +1,8 @@
-/** Formats an ISO kickoff timestamp in the viewer's own local timezone (not ESPN's Eastern-time strings). */
+/** Formats an ISO kickoff timestamp in the viewer's own local timezone (not ESPN's Eastern-time
+ * strings) — e.g. "Thu, 9/9 - 8:20 PM". */
 export function formatKickoff(iso: string): string {
   const d = new Date(iso);
-  const date = d.toLocaleDateString(undefined, { month: "numeric", day: "numeric" });
+  const date = d.toLocaleDateString(undefined, { weekday: "short", month: "numeric", day: "numeric" });
   const time = d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
   return `${date} - ${time}`;
 }
