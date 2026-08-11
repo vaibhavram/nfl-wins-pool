@@ -8,9 +8,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "Enter a valid email address." }, { status: 400 });
   }
 
+  const purpose = body?.purpose === "join_pool" ? "join_pool" : "sign_in";
   const appUrl = process.env.APP_URL ?? new URL(req.url).origin;
   try {
-    await issueMagicLink({ email, purpose: "sign_in", redirectTo: body?.redirectTo, appUrl });
+    await issueMagicLink({ email, purpose, redirectTo: body?.redirectTo, appUrl });
   } catch (err) {
     if (!(err instanceof RateLimitedError)) throw err;
     // fall through -- rate limiting is invisible to the client too
