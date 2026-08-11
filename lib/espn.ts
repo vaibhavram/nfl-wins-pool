@@ -50,7 +50,7 @@ export type LiveGame = {
   awayScore: number | null;
   homeScore: number | null;
   completed: boolean;
-  kickoff: string; // e.g. "Sun 1:00" or "Final"
+  date: string; // ISO kickoff timestamp — client formats it in the viewer's own timezone
 };
 
 export type LiveWeek = {
@@ -60,6 +60,7 @@ export type LiveWeek = {
 };
 
 type ScoreboardEvent = {
+  date: string;
   status: { type: { completed: boolean; shortDetail: string; description: string } };
   competitions: [
     {
@@ -92,7 +93,7 @@ export async function getWeekScoreboard(week: number, year: number): Promise<Liv
       awayScore: completed ? Number(away.score) : null,
       homeScore: completed ? Number(home.score) : null,
       completed,
-      kickoff: completed ? "Final" : ev.status.type.shortDetail,
+      date: ev.date,
     };
   });
   return {
@@ -127,10 +128,12 @@ export type TeamScheduleRow = {
   at: "@" | "vs" | "";
   opponent: string;
   result: "W" | "L" | "T" | "";
-  detail: string;
+  detail: string; // final score, once completed
+  date: string | null; // ISO kickoff timestamp for not-yet-played games; null for a bye week
 };
 
 type TeamScheduleEvent = {
+  date: string;
   week: { number: number };
   competitions: [
     {
@@ -155,7 +158,7 @@ export async function getTeamSchedule(abbr: string): Promise<TeamScheduleRow[]> 
     const opp = comp.competitors.find((c) => c !== me)!;
     const completed = comp.status.type.completed;
     let result: TeamScheduleRow["result"] = "";
-    let detail = comp.status.type.shortDetail;
+    let detail = "";
     if (completed) {
       const myScore = Number(me.score);
       const oppScore = Number(opp.score);
@@ -168,6 +171,7 @@ export async function getTeamSchedule(abbr: string): Promise<TeamScheduleRow[]> 
       opponent: opp.team.displayName,
       result,
       detail,
+      date: ev.date,
     };
   });
   // ESPN's `byeWeek` field is unreliable this far ahead of the season (seen pointing at a week
@@ -175,7 +179,7 @@ export async function getTeamSchedule(abbr: string): Promise<TeamScheduleRow[]> 
   const scheduledWeeks = new Set(rows.map((r) => r.week));
   for (let week = 1; week <= 18; week++) {
     if (!scheduledWeeks.has(week)) {
-      rows.push({ week, at: "", opponent: "Bye week", result: "", detail: "" });
+      rows.push({ week, at: "", opponent: "Bye week", result: "", detail: "", date: null });
       break;
     }
   }

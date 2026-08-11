@@ -6,6 +6,7 @@ import { TeamChip } from "@/components/TeamChip";
 import { useDraft } from "@/lib/store";
 import { TEAM } from "@/lib/teams";
 import { useStandings, useTeamSchedule } from "@/lib/live-data";
+import { formatKickoff } from "@/lib/format";
 
 function TeamDetailContent() {
   const router = useRouter();
@@ -89,7 +90,9 @@ function TeamDetailContent() {
                 >
                   {g.result}
                 </div>
-                <div style={{ width: 62, textAlign: "right", fontFamily: "ui-monospace,monospace", fontSize: 11.5, color: "var(--color-neutral-500)" }}>{g.detail}</div>
+                <div style={{ width: 62, textAlign: "right", fontFamily: "ui-monospace,monospace", fontSize: 11.5, color: "var(--color-neutral-500)" }}>
+                  {g.result ? g.detail : g.date ? formatKickoff(g.date) : ""}
+                </div>
               </div>
             );
           })}

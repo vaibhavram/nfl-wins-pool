@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { TeamChip } from "@/components/TeamChip";
+import { TeamLogo } from "@/components/TeamLogo";
 import { useAuth, useDraft } from "@/lib/store";
 import { TEAM } from "@/lib/teams";
 import { rostersFromPicks, totalWins } from "@/lib/draft";
@@ -53,7 +53,7 @@ export default function MyTeamsPage() {
                   cursor: "pointer",
                 }}
               >
-                <TeamChip ab={ab} size={44} fontSize={12} />
+                <TeamLogo ab={ab} size={44} />
                 <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 3 }}>
                   <div style={{ fontSize: 15, color: "var(--color-text)" }}>{team.full}</div>
                   <div style={{ fontSize: 12, color: "var(--color-neutral-500)" }}>

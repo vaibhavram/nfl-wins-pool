@@ -2,11 +2,12 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { TeamChip } from "@/components/TeamChip";
+import { TeamLogo } from "@/components/TeamLogo";
 import { useAuth, useDraft } from "@/lib/store";
 import { TEAM } from "@/lib/teams";
 import { rostersFromPicks } from "@/lib/draft";
 import { useWeek } from "@/lib/live-data";
+import { formatKickoff } from "@/lib/format";
 import type { LiveGame } from "@/lib/espn";
 
 export default function SchedulePage() {
@@ -115,7 +116,7 @@ export default function SchedulePage() {
                   onOwnerClick={() => router.push(`/team/${g.home}`)}
                 />
                 <div style={{ fontSize: 10, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--color-neutral-600)", borderTop: "1px solid var(--color-divider)", paddingTop: 5 }}>
-                  {g.kickoff}
+                  {g.completed ? "Final" : formatKickoff(g.date)}
                 </div>
               </div>
             );
@@ -144,7 +145,7 @@ function TeamRow({
 }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-      <TeamChip ab={ab} size={26} fontSize={8} />
+      <TeamLogo ab={ab} size={26} />
       <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", cursor: "pointer" }} onClick={onOwnerClick}>
         <div style={{ fontSize: 13, color: textColor, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{name}</div>
         <div style={{ fontSize: 10.5, color: owner ? "var(--color-neutral-500)" : "var(--color-neutral-700)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
