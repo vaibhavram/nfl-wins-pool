@@ -11,7 +11,7 @@ import { usePresence } from "@/lib/live-data";
 function LobbyContent() {
   const router = useRouter();
   const { manager, signOut } = useAuth();
-  const { picks, started, order, draftComplete, startDraft, resetDraft } = useDraft();
+  const { started, order, draftComplete, startDraft } = useDraft();
   const online = usePresence();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -40,13 +40,6 @@ function LobbyContent() {
     setBusy(false);
     if (result.ok) router.push("/draft");
     else setError(result.error);
-  }
-
-  function onReset() {
-    if (!manager) return;
-    if (window.confirm("Reset the draft? Every pick made so far will be cleared for everyone.")) {
-      resetDraft(manager.token);
-    }
   }
 
   return (
@@ -184,12 +177,7 @@ function LobbyContent() {
           </div>
         )}
         {error && <div style={{ fontSize: 12.5, color: "var(--color-accent-300)", textAlign: "center" }}>{error}</div>}
-        <div style={{ display: "flex", justifyContent: "center", gap: 16 }}>
-          {iAmCommissioner && (started || picks.length > 0) && (
-            <button className="btn btn-ghost" style={{ fontSize: 12.5 }} onClick={onReset}>
-              Reset draft
-            </button>
-          )}
+        <div style={{ display: "flex", justifyContent: "center" }}>
           <button className="btn btn-ghost" style={{ fontSize: 12.5 }} onClick={signOut}>
             Sign out
           </button>

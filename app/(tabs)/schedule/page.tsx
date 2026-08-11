@@ -8,7 +8,7 @@ import { TEAM } from "@/lib/teams";
 import { rostersFromPicks } from "@/lib/draft";
 import { useWeek } from "@/lib/live-data";
 import type { WeekGame } from "@/lib/live-data";
-import { formatKickoff } from "@/lib/format";
+import { formatKickoff, formatWinPct } from "@/lib/format";
 
 export default function SchedulePage() {
   const router = useRouter();
@@ -28,8 +28,12 @@ export default function SchedulePage() {
   const games = useMemo(() => {
     if (!data) return [];
     const isMine = (g: WeekGame) => myTeams.has(g.away) || myTeams.has(g.home);
-    // Stable sort: my games float to the top, otherwise ESPN's original ordering is preserved.
-    return [...data.games].sort((a, b) => Number(isMine(b)) - Number(isMine(a)));
+    // My games float to the top; within each group, earliest kickoff first.
+    return [...data.games].sort((a, b) => {
+      const mineDiff = Number(isMine(b)) - Number(isMine(a));
+      if (mineDiff !== 0) return mineDiff;
+      return new Date(a.date).getTime() - new Date(b.date).getTime();
+    });
   }, [data, myTeams]);
 
   if (error) {
@@ -117,7 +121,7 @@ export default function SchedulePage() {
                   textColor={g.completed ? (homeWon ? "var(--color-text)" : dim) : "var(--color-text)"}
                   onOwnerClick={() => router.push(`/team/${g.home}`)}
                 />
-                <div style={{ fontSize: 10, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--color-neutral-600)", borderTop: "1px solid var(--color-divider)", paddingTop: 5 }}>
+                <div style={{ fontSize: 11, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--color-neutral-600)", borderTop: "1px solid var(--color-divider)", paddingTop: 5 }}>
                   {g.completed ? "Final" : formatKickoff(g.date)}
                 </div>
               </div>
@@ -152,10 +156,10 @@ function TeamRow({
       <TeamLogo ab={ab} size={26} />
       <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", cursor: "pointer" }} onClick={onOwnerClick}>
         <div style={{ fontSize: 13, color: textColor, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{name}</div>
-        <div style={{ fontSize: 10.5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+        <div style={{ fontSize: 11.5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
           <span style={{ color: owner ? "var(--color-neutral-500)" : "var(--color-neutral-700)" }}>{owner ?? "undrafted"}</span>
           <span style={{ color: "var(--color-neutral-700)" }}> | </span>
-          <span style={{ color: winProb >= 0.5 ? "var(--color-accent-400)" : "var(--color-neutral-600)" }}>{Math.round(winProb * 100)}% to win</span>
+          <span style={{ color: winProb >= 0.5 ? "var(--color-accent-400)" : "var(--color-neutral-600)" }}>{formatWinPct(winProb * 100)}% to win</span>
         </div>
       </div>
       <div style={{ fontFamily: "ui-monospace,monospace", fontSize: 14, color: textColor }}>{score}</div>

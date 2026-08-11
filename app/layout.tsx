@@ -11,9 +11,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en">
       <body>
-        <AuthProvider>
-          <DraftProvider>{children}</DraftProvider>
-        </AuthProvider>
+        <DraftProvider>
+          <AuthProvider>{children}</AuthProvider>
+        </DraftProvider>
       </body>
     </html>
   );

@@ -30,6 +30,7 @@ type AuthContextValue = {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const { draftComplete } = useDraft();
   const [{ hydrated, manager }, setInit] = useState<{ hydrated: boolean; manager: Manager | null }>({
     hydrated: false,
     manager: null,
@@ -52,9 +53,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // Presence heartbeat: as long as this manager has the app open somewhere, ping every 20s so
-  // the lobby's "signed in" list reflects who's actually around right now.
+  // the lobby's "signed in" list reflects who's actually around right now. Once the draft's
+  // done, nobody looks at that list anymore — stop pinging.
   useEffect(() => {
-    if (!manager) return;
+    if (!manager || draftComplete) return;
     const ping = () => {
       fetch("/api/presence/heartbeat", {
         method: "POST",
@@ -64,7 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     ping();
     const id = setInterval(ping, HEARTBEAT_MS);
     return () => clearInterval(id);
-  }, [manager]);
+  }, [manager, draftComplete]);
 
   async function signIn(phone: string) {
     let res: Response;
@@ -159,11 +161,20 @@ export function DraftProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const takenAbs = useMemo(() => new Set(picks.map((p) => p.teamAb)), [picks]);
+  const draftOrder30 = useMemo(() => buildDraftOrder(order), [order]);
+  const currentPickIndex = picks.length < TOTAL_PICKS ? picks.length : -1;
+  const currentPickNo = picks.length < TOTAL_PICKS ? picks.length + 1 : TOTAL_PICKS + 1;
+  const onClockManager = currentPickIndex === -1 ? null : draftOrder30[currentPickIndex];
+  const draftComplete = currentPickIndex === -1;
+
   useEffect(() => {
     // Kicking off the initial poll is the effect synchronizing with the server, same as the
     // interval/visibility listeners right below it — not deriving state from a render.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchState();
+    // Picks/order are permanently frozen once the draft's done — no point polling forever.
+    if (draftComplete) return;
     const id = setInterval(fetchState, DRAFT_POLL_MS);
     const onVisible = () => {
       if (document.visibilityState === "visible") fetchState();
@@ -173,14 +184,7 @@ export function DraftProvider({ children }: { children: ReactNode }) {
       clearInterval(id);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [fetchState]);
-
-  const takenAbs = useMemo(() => new Set(picks.map((p) => p.teamAb)), [picks]);
-  const draftOrder30 = useMemo(() => buildDraftOrder(order), [order]);
-  const currentPickIndex = picks.length < TOTAL_PICKS ? picks.length : -1;
-  const currentPickNo = picks.length < TOTAL_PICKS ? picks.length + 1 : TOTAL_PICKS + 1;
-  const onClockManager = currentPickIndex === -1 ? null : draftOrder30[currentPickIndex];
-  const draftComplete = currentPickIndex === -1;
+  }, [fetchState, draftComplete]);
 
   function selectTeam(ab: string | null) {
     setSelectedTeam(ab);

@@ -2,11 +2,12 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { RequireAuth } from "@/components/RequireAuth";
-import { TeamChip } from "@/components/TeamChip";
+import { TeamLogo } from "@/components/TeamLogo";
+import { TabBar } from "@/components/TabBar";
 import { useDraft } from "@/lib/store";
 import { TEAM } from "@/lib/teams";
 import { useStandings, useTeamSchedule } from "@/lib/live-data";
-import { formatKickoff } from "@/lib/format";
+import { formatKickoff, formatWinPct } from "@/lib/format";
 
 function TeamDetailContent() {
   const router = useRouter();
@@ -41,7 +42,7 @@ function TeamDetailContent() {
         </button>
       </div>
       <div style={{ flex: "none", padding: "8px 20px 14px", borderBottom: "1px solid var(--color-divider)", display: "flex", alignItems: "center", gap: 14 }}>
-        <TeamChip ab={team.ab} size={54} fontSize={14} />
+        <TeamLogo ab={team.ab} size={54} />
         <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 3 }}>
           <h4 style={{ margin: 0, fontSize: 20, color: "var(--color-text)" }}>{team.full}</h4>
           <div style={{ fontSize: 12, color: "var(--color-neutral-500)" }}>
@@ -52,7 +53,7 @@ function TeamDetailContent() {
           <div style={{ fontFamily: "var(--font-heading)", fontSize: 26, color: "var(--color-text)" }}>
             {rec ? `${rec.wins}–${rec.losses}${rec.ties ? `–${rec.ties}` : ""}` : "–"}
           </div>
-          <div style={{ fontSize: 10.5, color: "var(--color-neutral-500)" }}>{18 - played} to play</div>
+          <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)" }}>{18 - played} to play</div>
         </div>
       </div>
       <div style={{ flex: 1, overflow: "auto", padding: "10px 14px 14px" }} className="scr">
@@ -82,8 +83,8 @@ function TeamDetailContent() {
                 <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 1 }}>
                   <div style={{ fontSize: 13.5, color: bye ? "var(--color-neutral-600)" : "var(--color-text)" }}>{g.opponent}</div>
                   {!g.result && g.winProb !== null && (
-                    <div style={{ fontSize: 10.5, color: g.winProb >= 0.5 ? "var(--color-accent-400)" : "var(--color-neutral-600)" }}>
-                      {Math.round(g.winProb * 100)}% to win
+                    <div style={{ fontSize: 11.5, color: g.winProb >= 0.5 ? "var(--color-accent-400)" : "var(--color-neutral-600)" }}>
+                      {formatWinPct(g.winProb * 100)}% to win
                     </div>
                   )}
                 </div>
@@ -105,6 +106,7 @@ function TeamDetailContent() {
           })}
         </div>
       </div>
+      <TabBar />
     </div>
   );
 }

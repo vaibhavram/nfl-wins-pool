@@ -8,6 +8,7 @@ import { TEAM } from "@/lib/teams";
 import { rostersFromPicks, totalWins } from "@/lib/draft";
 import { MANAGER_NAMES } from "@/lib/managers";
 import { useStandings, useSimulation } from "@/lib/live-data";
+import { formatWinPct } from "@/lib/format";
 
 function fmtWins(w: number) {
   return Number.isInteger(w) ? String(w) : w.toFixed(1);
@@ -81,8 +82,8 @@ export default function LeaderboardPage() {
                       {mine && " (you)"}
                     </div>
                     {winPct !== undefined && (
-                      <div style={{ fontSize: 10.5, color: "var(--color-accent-400)" }}>
-                        {winPct >= 1 ? winPct.toFixed(1) : winPct.toFixed(2)}% win prob
+                      <div style={{ fontSize: 11.5, color: "var(--color-accent-400)" }}>
+                        {formatWinPct(winPct)}% win prob
                       </div>
                     )}
                   </div>
@@ -97,7 +98,7 @@ export default function LeaderboardPage() {
                         style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2, cursor: "pointer" }}
                       >
                         <TeamLogo ab={ab} size={26} />
-                        <div style={{ fontFamily: "ui-monospace,monospace", fontSize: 10, color: "var(--color-neutral-400)" }}>
+                        <div style={{ fontFamily: "ui-monospace,monospace", fontSize: 11, color: "var(--color-neutral-400)" }}>
                           {fmtWins(standings[ab] ? standings[ab].wins + standings[ab].ties * 0.5 : 0)}
                         </div>
                       </div>
