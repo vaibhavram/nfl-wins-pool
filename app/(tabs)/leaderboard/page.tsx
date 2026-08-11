@@ -59,6 +59,7 @@ export default function LeaderboardPage() {
             return (
               <div
                 key={r.name}
+                onClick={() => router.push(`/manager/${encodeURIComponent(r.name)}`)}
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -67,16 +68,14 @@ export default function LeaderboardPage() {
                   borderRadius: "var(--radius-md)",
                   background: mine ? "var(--color-accent-900)" : "var(--color-surface)",
                   border: `1px solid ${mine ? "var(--color-accent-700)" : "var(--color-divider)"}`,
+                  cursor: "pointer",
                 }}
               >
                 <div style={{ width: 18, fontFamily: "ui-monospace,monospace", fontSize: 14, color: idx === 0 ? "var(--color-accent-300)" : "var(--color-neutral-500)" }}>
                   {idx + 1}
                 </div>
                 <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, minWidth: 0 }}>
-                  <div
-                    onClick={() => router.push(`/manager/${encodeURIComponent(r.name)}`)}
-                    style={{ display: "flex", flexDirection: "column", gap: 1, minWidth: 0, cursor: "pointer" }}
-                  >
+                  <div style={{ display: "flex", flexDirection: "column", gap: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 14.5, color: "var(--color-text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                       {r.name}
                       {mine && " (you)"}
@@ -91,7 +90,10 @@ export default function LeaderboardPage() {
                     {r.teams.map((ab) => (
                       <div
                         key={ab}
-                        onClick={() => router.push(`/team/${ab}`)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          router.push(`/team/${ab}`);
+                        }}
                         style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2, cursor: "pointer" }}
                       >
                         <TeamLogo ab={ab} size={26} />
