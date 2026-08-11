@@ -74,9 +74,11 @@ export function useSimulation() {
   return { results: data?.results ?? [], loading, error };
 }
 
+export type TeamScheduleRowWithProb = TeamScheduleRow & { winProb: number | null };
+
 export function useTeamSchedule(abbr: string | null) {
   const url = abbr ? `/api/nfl/team/${abbr}/schedule` : null;
-  const { data, loading, error } = useJsonFetch<{ schedule: TeamScheduleRow[] }>(url);
+  const { data, loading, error } = useJsonFetch<{ schedule: TeamScheduleRowWithProb[] }>(url);
   return { schedule: data?.schedule ?? null, loading, error };
 }
 

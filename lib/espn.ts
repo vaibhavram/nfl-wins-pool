@@ -127,6 +127,7 @@ export type TeamScheduleRow = {
   week: number;
   at: "@" | "vs" | "";
   opponent: string;
+  opponentAb: string; // "" for a bye week
   result: "W" | "L" | "T" | "";
   detail: string; // final score, once completed
   date: string | null; // ISO kickoff timestamp for not-yet-played games; null for a bye week
@@ -169,6 +170,7 @@ export async function getTeamSchedule(abbr: string): Promise<TeamScheduleRow[]> 
       week: ev.week.number,
       at: me.homeAway === "home" ? "vs" : "@",
       opponent: opp.team.displayName,
+      opponentAb: opp.team.abbreviation,
       result,
       detail,
       date: ev.date,
@@ -179,7 +181,7 @@ export async function getTeamSchedule(abbr: string): Promise<TeamScheduleRow[]> 
   const scheduledWeeks = new Set(rows.map((r) => r.week));
   for (let week = 1; week <= 18; week++) {
     if (!scheduledWeeks.has(week)) {
-      rows.push({ week, at: "", opponent: "Bye week", result: "", detail: "", date: null });
+      rows.push({ week, at: "", opponent: "Bye week", opponentAb: "", result: "", detail: "", date: null });
       break;
     }
   }

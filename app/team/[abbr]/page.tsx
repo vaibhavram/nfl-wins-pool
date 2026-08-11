@@ -79,7 +79,14 @@ function TeamDetailContent() {
               >
                 <div style={{ width: 26, fontFamily: "ui-monospace,monospace", fontSize: 11.5, color: "var(--color-neutral-600)" }}>W{g.week}</div>
                 <div style={{ width: 20, fontSize: 11, color: "var(--color-neutral-600)" }}>{g.at}</div>
-                <div style={{ flex: 1, fontSize: 13.5, color: bye ? "var(--color-neutral-600)" : "var(--color-text)" }}>{g.opponent}</div>
+                <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 1 }}>
+                  <div style={{ fontSize: 13.5, color: bye ? "var(--color-neutral-600)" : "var(--color-text)" }}>{g.opponent}</div>
+                  {!g.result && g.winProb !== null && (
+                    <div style={{ fontSize: 10.5, color: g.winProb >= 0.5 ? "var(--color-accent-400)" : "var(--color-neutral-600)" }}>
+                      {Math.round(g.winProb * 100)}% to win
+                    </div>
+                  )}
+                </div>
                 <div
                   style={{
                     width: 22,

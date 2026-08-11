@@ -32,8 +32,8 @@ export default function LeaderboardPage() {
       name,
       teams: rosters[name],
       wins: totalWins(rosters[name], standings),
-    })).sort((a, b) => b.wins - a.wins);
-  }, [picks, standings]);
+    })).sort((a, b) => b.wins - a.wins || (winPctByManager[b.name] ?? 0) - (winPctByManager[a.name] ?? 0));
+  }, [picks, standings, winPctByManager]);
 
   const undrafted = useMemo(() => {
     const takenAbs = new Set(picks.map((p) => p.teamAb));
@@ -80,7 +80,7 @@ export default function LeaderboardPage() {
                     </div>
                     {winPct !== undefined && (
                       <div style={{ fontSize: 10.5, color: "var(--color-accent-400)" }}>
-                        {winPct >= 1 ? winPct.toFixed(1) : winPct.toFixed(2)}% to win pool
+                        {winPct >= 1 ? winPct.toFixed(1) : winPct.toFixed(2)}% win prob
                       </div>
                     )}
                   </div>

@@ -152,11 +152,10 @@ function TeamRow({
       <TeamLogo ab={ab} size={26} />
       <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", cursor: "pointer" }} onClick={onOwnerClick}>
         <div style={{ fontSize: 13, color: textColor, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{name}</div>
-        <div style={{ fontSize: 10, color: winProb >= 0.5 ? "var(--color-accent-400)" : "var(--color-neutral-600)" }}>
-          {Math.round(winProb * 100)}% to win
-        </div>
-        <div style={{ fontSize: 10.5, color: owner ? "var(--color-neutral-500)" : "var(--color-neutral-700)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-          {owner ?? "undrafted"}
+        <div style={{ fontSize: 10.5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          <span style={{ color: owner ? "var(--color-neutral-500)" : "var(--color-neutral-700)" }}>{owner ?? "undrafted"}</span>
+          <span style={{ color: "var(--color-neutral-700)" }}> | </span>
+          <span style={{ color: winProb >= 0.5 ? "var(--color-accent-400)" : "var(--color-neutral-600)" }}>{Math.round(winProb * 100)}% to win</span>
         </div>
       </div>
       <div style={{ fontFamily: "ui-monospace,monospace", fontSize: 14, color: textColor }}>{score}</div>
