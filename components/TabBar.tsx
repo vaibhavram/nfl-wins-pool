@@ -2,11 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { PodiumIcon, CalendarIcon, FootballIcon, DraftResultsIcon } from "./TabIcons";
 
 const TABS = [
-  { href: "/leaderboard", label: "Leaderboard" },
-  { href: "/schedule", label: "Schedule" },
-  { href: "/my-teams", label: "My teams" },
+  { href: "/leaderboard", label: "Leaderboard", Icon: PodiumIcon },
+  { href: "/schedule", label: "Schedule", Icon: CalendarIcon },
+  { href: "/my-teams", label: "My teams", Icon: FootballIcon },
+  { href: "/draft-results", label: "Draft", Icon: DraftResultsIcon },
 ];
 
 export function TabBar() {
@@ -17,7 +19,7 @@ export function TabBar() {
         const active = pathname === tab.href;
         return (
           <Link key={tab.href} href={tab.href} className="tab-item" data-active={active}>
-            <span className="tab-dot" />
+            <tab.Icon />
             {tab.label}
           </Link>
         );

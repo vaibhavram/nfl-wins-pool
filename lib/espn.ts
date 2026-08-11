@@ -109,7 +109,9 @@ type StandingsEntry = { team: { abbreviation: string }; stats: StandingsStat[] }
 type StandingsResponse = { standings: { season: number; entries: StandingsEntry[] } };
 
 export async function getStandings(): Promise<Record<string, TeamRecord>> {
-  const data = await getJson<StandingsResponse>(`${CORE_BASE}/standings?level=1`, WEEK_REVALIDATE_SECONDS);
+  // Without `seasontype`, ESPN defaults to whatever season type is "current" — during Aug/Sep
+  // that's preseason (type 1), which would count Hall of Fame/preseason wins toward the pool.
+  const data = await getJson<StandingsResponse>(`${CORE_BASE}/standings?level=1&seasontype=${REGULAR_SEASON}`, WEEK_REVALIDATE_SECONDS);
   const out: Record<string, TeamRecord> = {};
   for (const entry of data.standings.entries) {
     const stat = (name: string) => entry.stats.find((s) => s.name === name)?.value ?? 0;
@@ -143,7 +145,9 @@ type TeamScheduleEvent = {
 type TeamScheduleResponse = { events: TeamScheduleEvent[] };
 
 export async function getTeamSchedule(abbr: string): Promise<TeamScheduleRow[]> {
-  const url = `${SITE_BASE}/teams/${abbr.toLowerCase()}/schedule`;
+  // Without `seasontype`, this endpoint returns only preseason games (weeks 1-4) once the
+  // preseason is underway — regular season needs to be requested explicitly.
+  const url = `${SITE_BASE}/teams/${abbr.toLowerCase()}/schedule?seasontype=${REGULAR_SEASON}`;
   const data = await getJson<TeamScheduleResponse>(url, WEEK_REVALIDATE_SECONDS);
   const rows: TeamScheduleRow[] = data.events.map((ev) => {
     const comp = ev.competitions[0];

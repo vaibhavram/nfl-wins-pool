@@ -232,15 +232,6 @@ a {
   color: var(--color-accent-200);
   background: var(--color-accent-900);
 }
-.tab-item .tab-dot {
-  width: 16px;
-  height: 2px;
-  border-radius: 2px;
-  background: transparent;
-}
-.tab-item[data-active="true"] .tab-dot {
-  background: var(--color-accent);
-}
 
 .team-chip {
   border-radius: 50%;
