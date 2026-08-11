@@ -7,8 +7,8 @@ import { useAuth, useDraft } from "@/lib/store";
 import { TEAM } from "@/lib/teams";
 import { rostersFromPicks } from "@/lib/draft";
 import { useWeek } from "@/lib/live-data";
+import type { WeekGame } from "@/lib/live-data";
 import { formatKickoff } from "@/lib/format";
-import type { LiveGame } from "@/lib/espn";
 
 export default function SchedulePage() {
   const router = useRouter();
@@ -27,7 +27,7 @@ export default function SchedulePage() {
 
   const games = useMemo(() => {
     if (!data) return [];
-    const isMine = (g: LiveGame) => myTeams.has(g.away) || myTeams.has(g.home);
+    const isMine = (g: WeekGame) => myTeams.has(g.away) || myTeams.has(g.home);
     // Stable sort: my games float to the top, otherwise ESPN's original ordering is preserved.
     return [...data.games].sort((a, b) => Number(isMine(b)) - Number(isMine(a)));
   }, [data, myTeams]);
@@ -78,7 +78,7 @@ export default function SchedulePage() {
       </div>
       <div style={{ flex: 1, overflow: "auto", padding: "8px 12px 14px" }} className="scr">
         <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-          {games.map((g: LiveGame, i: number) => {
+          {games.map((g: WeekGame, i: number) => {
             const away = TEAM[g.away];
             const home = TEAM[g.home];
             const awayWon = g.completed && (g.awayScore ?? 0) > (g.homeScore ?? 0);
@@ -103,6 +103,7 @@ export default function SchedulePage() {
                   ab={g.away}
                   name={away?.full ?? g.away}
                   owner={owners[g.away]}
+                  winProb={1 - g.homeWinProb}
                   score={g.completed ? String(g.awayScore) : ""}
                   textColor={g.completed ? (awayWon ? "var(--color-text)" : dim) : "var(--color-text)"}
                   onOwnerClick={() => router.push(`/team/${g.away}`)}
@@ -111,6 +112,7 @@ export default function SchedulePage() {
                   ab={g.home}
                   name={home?.full ?? g.home}
                   owner={owners[g.home]}
+                  winProb={g.homeWinProb}
                   score={g.completed ? String(g.homeScore) : ""}
                   textColor={g.completed ? (homeWon ? "var(--color-text)" : dim) : "var(--color-text)"}
                   onOwnerClick={() => router.push(`/team/${g.home}`)}
@@ -132,6 +134,7 @@ function TeamRow({
   ab,
   name,
   owner,
+  winProb,
   score,
   textColor,
   onOwnerClick,
@@ -139,6 +142,7 @@ function TeamRow({
   ab: string;
   name: string;
   owner: string | undefined;
+  winProb: number;
   score: string;
   textColor: string;
   onOwnerClick: () => void;
@@ -148,6 +152,9 @@ function TeamRow({
       <TeamLogo ab={ab} size={26} />
       <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", cursor: "pointer" }} onClick={onOwnerClick}>
         <div style={{ fontSize: 13, color: textColor, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{name}</div>
+        <div style={{ fontSize: 10, color: winProb >= 0.5 ? "var(--color-accent-400)" : "var(--color-neutral-600)" }}>
+          {Math.round(winProb * 100)}% to win
+        </div>
         <div style={{ fontSize: 10.5, color: owner ? "var(--color-neutral-500)" : "var(--color-neutral-700)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
           {owner ?? "undrafted"}
         </div>

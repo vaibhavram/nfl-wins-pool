@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentRegularSeasonWeek, getWeekScoreboard } from "@/lib/espn";
+import { attachWinProbabilities } from "@/lib/simulation";
 
 const MIN_WEEK = 1;
 const MAX_WEEK = 18;
@@ -13,6 +14,7 @@ export async function GET(req: NextRequest) {
   week = Math.min(MAX_WEEK, Math.max(MIN_WEEK, week));
 
   const live = await getWeekScoreboard(week, year);
+  const games = await attachWinProbabilities(live.games);
 
   return NextResponse.json({
     week: live.week,
@@ -20,7 +22,7 @@ export async function GET(req: NextRequest) {
     currentWeek,
     minWeek: MIN_WEEK,
     maxWeek: MAX_WEEK,
-    games: live.games,
+    games,
     byeTeams: live.byeTeams,
   });
 }

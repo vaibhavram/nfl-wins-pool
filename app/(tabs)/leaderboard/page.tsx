@@ -7,7 +7,7 @@ import { useAuth, useDraft } from "@/lib/store";
 import { TEAM } from "@/lib/teams";
 import { rostersFromPicks, totalWins } from "@/lib/draft";
 import { MANAGER_NAMES } from "@/lib/managers";
-import { useStandings } from "@/lib/live-data";
+import { useStandings, useSimulation } from "@/lib/live-data";
 
 function fmtWins(w: number) {
   return Number.isInteger(w) ? String(w) : w.toFixed(1);
@@ -18,6 +18,13 @@ export default function LeaderboardPage() {
   const { manager } = useAuth();
   const { picks } = useDraft();
   const { standings, loading, error } = useStandings();
+  const { results: simResults } = useSimulation();
+
+  const winPctByManager = useMemo(() => {
+    const out: Record<string, number> = {};
+    for (const r of simResults) out[r.manager] = r.winPct;
+    return out;
+  }, [simResults]);
 
   const rows = useMemo(() => {
     const rosters = rostersFromPicks(picks);
@@ -48,6 +55,7 @@ export default function LeaderboardPage() {
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           {rows.map((r, idx) => {
             const mine = r.name === manager?.name;
+            const winPct = winPctByManager[r.name];
             return (
               <div
                 key={r.name}
@@ -65,9 +73,16 @@ export default function LeaderboardPage() {
                   {idx + 1}
                 </div>
                 <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, minWidth: 0 }}>
-                  <div style={{ fontSize: 14.5, color: "var(--color-text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                    {r.name}
-                    {mine && " (you)"}
+                  <div style={{ display: "flex", flexDirection: "column", gap: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 14.5, color: "var(--color-text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {r.name}
+                      {mine && " (you)"}
+                    </div>
+                    {winPct !== undefined && (
+                      <div style={{ fontSize: 10.5, color: "var(--color-accent-400)" }}>
+                        {winPct >= 1 ? winPct.toFixed(1) : winPct.toFixed(2)}% to win pool
+                      </div>
+                    )}
                   </div>
                   <div style={{ display: "flex", gap: 8, flex: "none" }}>
                     {r.teams.map((ab) => (

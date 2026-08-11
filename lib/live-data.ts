@@ -40,13 +40,15 @@ export function useStandings() {
   return { standings: data?.standings ?? {}, loading, error };
 }
 
+export type WeekGame = LiveGame & { homeWinProb: number };
+
 export type WeekResponse = {
   week: number;
   year: number;
   currentWeek: number;
   minWeek: number;
   maxWeek: number;
-  games: LiveGame[];
+  games: WeekGame[];
   byeTeams: string[];
 };
 
@@ -54,6 +56,22 @@ export function useWeek(week: number | null) {
   const url = week === null ? "/api/nfl/week" : `/api/nfl/week?week=${week}`;
   const { data, loading, error } = useJsonFetch<WeekResponse>(url);
   return { week: data, loading, error };
+}
+
+export type SimulationResult = {
+  manager: string;
+  teams: string[];
+  winPct: number;
+  avgWins: number;
+  medianWins: number;
+  p10Wins: number;
+  p90Wins: number;
+};
+
+/** Pool-winner probabilities from the Elo Monte Carlo simulation — see lib/simulation.ts. */
+export function useSimulation() {
+  const { data, loading, error } = useJsonFetch<{ results: SimulationResult[] }>("/api/analytics/simulate");
+  return { results: data?.results ?? [], loading, error };
 }
 
 export function useTeamSchedule(abbr: string | null) {
