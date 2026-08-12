@@ -12,7 +12,11 @@ export async function POST(req: Request) {
   if (!result.ok) return NextResponse.json(result, { status: 400 });
 
   const sessionToken = createSessionToken(result.userId, result.tokenVersion);
-  const res = NextResponse.json({ ok: true, redirectTo: result.redirectTo ?? "/pools" });
+  const res = NextResponse.json({
+    ok: true,
+    redirectTo: result.redirectTo ?? "/pools",
+    needsOnboarding: result.needsOnboarding,
+  });
   res.cookies.set(SESSION_COOKIE, sessionToken, {
     httpOnly: true,
     secure: true,

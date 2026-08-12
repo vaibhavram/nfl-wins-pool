@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { createPool } from "@/lib/pools-server";
-
-const PICK_CLOCK_OPTIONS_SECONDS = new Set([60, 120, 300, 600, 3600, 14400, 28800, 43200, 86400]);
+import { PICK_CLOCK_OPTIONS_SECONDS } from "@/lib/pick-clock-options";
 
 export async function POST(req: Request) {
   const user = await getCurrentUser();

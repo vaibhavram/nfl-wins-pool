@@ -23,6 +23,8 @@ export default async function SettingsPage({ params }: { params: Promise<{ slug:
       slug={slug}
       poolName={pool.name}
       draftStarted={season?.status !== "filling" && season?.status !== "ready"}
+      pickClockSeconds={season?.pick_clock_seconds ?? 43200}
+      scheduledDraftAt={season?.scheduled_draft_at ?? null}
       members={members.filter((m) => m.role !== "commissioner")}
       pendingInvites={invites.filter((i) => !i.accepted_at && !i.revoked_at).map((i) => ({ id: i.id, email: i.email! }))}
     />

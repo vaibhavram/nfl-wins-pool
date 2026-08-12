@@ -6,6 +6,7 @@ import { getCurrentUser } from "@/lib/auth/current-user";
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser();
   if (!user) redirect("/sign-in");
+  if (!user.onboarded) redirect("/onboarding");
 
   return <div className="app-shell">{children}</div>;
 }

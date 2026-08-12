@@ -16,6 +16,28 @@ export type MagicLinkPurpose = "sign_in" | "join_pool" | "claim";
 
 export class RateLimitedError extends Error {}
 
+function emailContent(
+  purpose: MagicLinkPurpose,
+  link: string,
+  inviteContext?: { inviterName: string; poolName: string },
+): { subject: string; text: string; html: string } {
+  if (purpose === "join_pool" && inviteContext) {
+    const { inviterName, poolName } = inviteContext;
+    const intro = `${inviterName} invited you to join ${poolName} on The Wins Pool. Please click the link below to accept the invite.`;
+    return {
+      subject: `${inviterName} invited you to ${poolName}`,
+      text: `${intro}\n\n${link}\n\nThis link remains active for 20 minutes.`,
+      html: `<p>${intro}</p><p><a href="${link}">Accept the invite</a></p><p>This link remains active for 20 minutes.</p>`,
+    };
+  }
+  const intro = "You requested a sign-in link from The Wins Pool. Please click the link below to verify your email.";
+  return {
+    subject: "Your sign-in link",
+    text: `Hi,\n\n${intro} The link remains active for 20 minutes.\n\n${link}`,
+    html: `<p>Hi,</p><p>${intro} The link remains active for 20 minutes.</p><p><a href="${link}">Verify your email</a></p>`,
+  };
+}
+
 /** Issues a single-use magic link and emails it. Callers should treat RateLimitedError the
  * same as success (never reveal whether an address is known or how many times it's been
  * tried) -- see app/api/auth/request-link/route.ts. */
@@ -25,6 +47,7 @@ export async function issueMagicLink(params: {
   redirectTo?: string;
   userId?: string;
   appUrl: string;
+  inviteContext?: { inviterName: string; poolName: string };
 }): Promise<void> {
   const email = params.email.trim().toLowerCase();
 
@@ -46,22 +69,21 @@ export async function issueMagicLink(params: {
   );
 
   const link = `${params.appUrl}/auth/link?t=${raw}`;
-  await sendEmail({
-    to: email,
-    subject: "Your sign-in link",
-    text: `Sign in: ${link}\n\nThis link works for 20 minutes and only once.`,
-    html: `<p><a href="${link}">Sign in</a></p><p>This link works for 20 minutes and only once.</p>`,
-  });
+  const { subject, text, html } = emailContent(params.purpose, link, params.inviteContext);
+  await sendEmail({ to: email, subject, text, html });
 }
 
 export type ConsumeResult =
-  | { ok: true; userId: string; tokenVersion: number; redirectTo: string | null }
+  | { ok: true; userId: string; tokenVersion: number; redirectTo: string | null; needsOnboarding: boolean }
   | { ok: false; error: string };
 
 /** Atomically marks the link consumed (single UPDATE...RETURNING, no read-then-write race,
  * matching the concurrency pattern lib/draft-server.ts already uses for pick submission), then
- * resolves or creates the user. Claim-purpose links (Phase 4) pin a user_id up front; this
- * function will need a small extension then to also fill in that user's email. */
+ * resolves or creates the user. An email-invite link's purpose='join_pool' link also serves as
+ * that person's identity verification -- clicking it (from their own inbox) is itself proof of
+ * email ownership, so no separate sign-in round-trip is needed on top of it. Claim-purpose links
+ * (Phase 4) pin a user_id up front; this function will need a small extension then to also fill
+ * in that user's email. */
 export async function consumeMagicLink(rawToken: string): Promise<ConsumeResult> {
   const rows = await query<{
     id: string;
@@ -93,8 +115,17 @@ export async function consumeMagicLink(rawToken: string): Promise<ConsumeResult>
     }
   }
 
-  const userRow = await query<{ token_version: number }>("SELECT token_version FROM users WHERE id = $1", [userId]);
+  const userRow = await query<{ token_version: number; onboarded_at: string | null }>(
+    "SELECT token_version, onboarded_at FROM users WHERE id = $1",
+    [userId],
+  );
   if (!userRow[0]) return { ok: false, error: "Account not found." };
 
-  return { ok: true, userId, tokenVersion: userRow[0].token_version, redirectTo: link.redirect_to };
+  return {
+    ok: true,
+    userId,
+    tokenVersion: userRow[0].token_version,
+    redirectTo: link.redirect_to,
+    needsOnboarding: userRow[0].onboarded_at === null,
+  };
 }

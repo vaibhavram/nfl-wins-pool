@@ -24,6 +24,12 @@ export function LinkConsumeContent() {
       .then((res) => res.json())
       .then((data) => {
         if (data.ok) {
+          if (data.needsOnboarding) {
+            // Skip the "you're signed in" screen for brand-new users -- go straight to the one
+            // more step they actually need, carrying the original destination along with it.
+            router.push(`/onboarding?redirectTo=${encodeURIComponent(data.redirectTo ?? "/pools")}`);
+            return;
+          }
           setRedirectTo(data.redirectTo ?? "/pools");
           setStatus("success");
         } else {
@@ -35,7 +41,7 @@ export function LinkConsumeContent() {
         setStatus("error");
         setError("Couldn't reach the server. Check your connection and try again.");
       });
-  }, [token]);
+  }, [token, router]);
 
   if (status === "consuming") {
     return (

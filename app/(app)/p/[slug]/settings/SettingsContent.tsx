@@ -4,19 +4,32 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { MemberRow } from "@/lib/pools-server";
+import { PICK_CLOCK_OPTIONS } from "@/lib/pick-clock-options";
 
 type PendingInvite = { id: string; email: string };
+
+/** <input type="datetime-local"> wants "YYYY-MM-DDTHH:mm" in local time, not an ISO string. */
+function toLocalInputValue(iso: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
 
 export function SettingsContent({
   slug,
   poolName: initialName,
   draftStarted,
+  pickClockSeconds: initialPickClockSeconds,
+  scheduledDraftAt: initialScheduledDraftAt,
   members: initialMembers,
   pendingInvites: initialInvites,
 }: {
   slug: string;
   poolName: string;
   draftStarted: boolean;
+  pickClockSeconds: number;
+  scheduledDraftAt: string | null;
   members: MemberRow[];
   pendingInvites: PendingInvite[];
 }) {
@@ -27,6 +40,27 @@ export function SettingsContent({
   const [invites, setInvites] = useState(initialInvites);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [pickClockSeconds, setPickClockSeconds] = useState(initialPickClockSeconds);
+  const [scheduledDraftAt, setScheduledDraftAt] = useState(toLocalInputValue(initialScheduledDraftAt));
+  const [savingDraftSettings, setSavingDraftSettings] = useState(false);
+  const draftSettingsDirty =
+    pickClockSeconds !== initialPickClockSeconds || scheduledDraftAt !== toLocalInputValue(initialScheduledDraftAt);
+
+  async function saveDraftSettings() {
+    setSavingDraftSettings(true);
+    const res = await fetch(`/api/p/${slug}/draft-settings`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        pickClockSeconds,
+        scheduledDraftAt: scheduledDraftAt ? new Date(scheduledDraftAt).toISOString() : null,
+      }),
+    });
+    const data = await res.json();
+    setSavingDraftSettings(false);
+    if (!data.ok) setError(data.error ?? "Couldn't save draft settings.");
+    else router.refresh();
+  }
 
   async function saveName() {
     if (!name.trim()) return;
@@ -90,6 +124,63 @@ export function SettingsContent({
         </div>
 
         {error && <div style={{ fontSize: 12.5, color: "var(--color-accent-300)" }}>{error}</div>}
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <div style={{ fontSize: 11.5, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--color-neutral-600)" }}>Draft settings</div>
+          {draftStarted ? (
+            <div style={{ fontSize: 13, color: "var(--color-neutral-600)" }}>Locked in once the draft starts.</div>
+          ) : (
+            <>
+              <div className="field">
+                <label>Pick clock</label>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  {PICK_CLOCK_OPTIONS.map((opt) => {
+                    const active = opt.seconds === pickClockSeconds;
+                    return (
+                      <button
+                        key={opt.seconds}
+                        type="button"
+                        onClick={() => setPickClockSeconds(opt.seconds)}
+                        style={{
+                          padding: "8px 12px",
+                          borderRadius: "var(--radius-sm)",
+                          fontSize: 13,
+                          cursor: "pointer",
+                          color: active ? "var(--color-accent-200)" : "var(--color-neutral-400)",
+                          background: active ? "var(--color-accent-900)" : "var(--color-surface)",
+                          border: `1px solid ${active ? "var(--color-accent)" : "var(--color-divider)"}`,
+                        }}
+                      >
+                        {opt.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="field">
+                <label htmlFor="scheduled-draft-at">Draft date &amp; time (optional)</label>
+                <input
+                  id="scheduled-draft-at"
+                  className="input"
+                  type="datetime-local"
+                  style={{ minHeight: 44, fontSize: 15 }}
+                  value={scheduledDraftAt}
+                  onChange={(e) => setScheduledDraftAt(e.target.value)}
+                />
+              </div>
+
+              <button
+                className="btn btn-secondary"
+                style={{ alignSelf: "flex-start", minHeight: 40, paddingInline: 14, fontSize: 13.5 }}
+                onClick={saveDraftSettings}
+                disabled={savingDraftSettings || !draftSettingsDirty}
+              >
+                {savingDraftSettings ? "Saving…" : "Save draft settings"}
+              </button>
+            </>
+          )}
+        </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>

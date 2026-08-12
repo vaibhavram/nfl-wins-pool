@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireMember } from "@/lib/auth/require-member";
 import { getOrCreateShareLink, createEmailInvite, listInvites } from "@/lib/invites-server";
-import { sendEmail } from "@/lib/email";
+import { issueMagicLink, RateLimitedError } from "@/lib/auth/magic-link";
 
 export async function GET(_req: Request, ctx: RouteContext<"/api/p/[slug]/invites">) {
   const { slug } = await ctx.params;
@@ -26,14 +26,21 @@ export async function POST(req: Request, ctx: RouteContext<"/api/p/[slug]/invite
 
   const invite = await createEmailInvite(ctxOrError.pool.id, ctxOrError.user.id, email);
 
+  // The invite link IS a magic link: clicking it (from the recipient's own inbox) verifies their
+  // email and signs them in in one step, landing straight on the join-confirm screen -- no
+  // separate "now sign in" round-trip on top of the invite itself.
   const appUrl = process.env.APP_URL ?? new URL(req.url).origin;
-  const link = `${appUrl}/join/${invite.token}`;
-  await sendEmail({
-    to: email,
-    subject: `${ctxOrError.user.displayName} invited you to ${ctxOrError.pool.name}`,
-    text: `You're invited to join "${ctxOrError.pool.name}" on NFL Wins Pool.\n\n${link}`,
-    html: `<p>You're invited to join <strong>${ctxOrError.pool.name}</strong> on NFL Wins Pool.</p><p><a href="${link}">Join the pool</a></p>`,
-  });
+  try {
+    await issueMagicLink({
+      email,
+      purpose: "join_pool",
+      redirectTo: `/join/${invite.token}`,
+      appUrl,
+      inviteContext: { inviterName: ctxOrError.user.displayName, poolName: ctxOrError.pool.name },
+    });
+  } catch (err) {
+    if (!(err instanceof RateLimitedError)) throw err;
+  }
 
   return NextResponse.json({ ok: true, invite });
 }

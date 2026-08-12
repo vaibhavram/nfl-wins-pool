@@ -38,6 +38,7 @@ export type SeasonRow = {
   season_year: number;
   status: "filling" | "ready" | "drafting" | "in_season" | "final";
   pick_clock_seconds: number;
+  scheduled_draft_at: string | null;
   draft_started_at: string | null;
   draft_completed_at: string | null;
 };
@@ -208,4 +209,27 @@ export async function removeMember(poolId: string, userId: string): Promise<Remo
 
 export async function renamePool(poolId: string, name: string): Promise<void> {
   await query("UPDATE pools SET name = $1 WHERE id = $2", [name, poolId]);
+}
+
+export type UpdateDraftSettingsResult = { ok: true } | { ok: false; error: string };
+
+/** Commissioner-only, and only while the draft hasn't started -- once picks exist, the clock and
+ * schedule are no longer meaningful to change. */
+export async function updateDraftSettings(
+  seasonId: string,
+  updates: { pickClockSeconds?: number; scheduledDraftAt?: string | null },
+): Promise<UpdateDraftSettingsResult> {
+  const season = await query<SeasonRow>("SELECT * FROM pool_seasons WHERE id = $1", [seasonId]);
+  if (!season[0]) return { ok: false, error: "Season not found." };
+  if (season[0].status !== "filling" && season[0].status !== "ready") {
+    return { ok: false, error: "Draft settings can't be changed once the draft has started." };
+  }
+
+  if (updates.pickClockSeconds !== undefined) {
+    await query("UPDATE pool_seasons SET pick_clock_seconds = $1 WHERE id = $2", [updates.pickClockSeconds, seasonId]);
+  }
+  if (updates.scheduledDraftAt !== undefined) {
+    await query("UPDATE pool_seasons SET scheduled_draft_at = $1 WHERE id = $2", [updates.scheduledDraftAt, seasonId]);
+  }
+  return { ok: true };
 }
