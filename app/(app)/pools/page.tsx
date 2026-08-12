@@ -3,6 +3,20 @@ import { getCurrentUser } from "@/lib/auth/current-user";
 import { getUserPools, type PoolCard } from "@/lib/dashboard-server";
 import { SignOutButton } from "@/components/SignOutButton";
 
+function poolHref(slug: string, status: PoolCard["status"]): string {
+  switch (status) {
+    case "filling":
+      return `/p/${slug}/invite`;
+    case "ready":
+      return `/p/${slug}/lobby`;
+    case "drafting":
+      return `/p/${slug}/draft`;
+    case "in_season":
+    case "final":
+      return `/p/${slug}/leaderboard`;
+  }
+}
+
 function statusLabel(status: PoolCard["status"], memberCount: number): { label: string; color: string } {
   switch (status) {
     case "filling":
@@ -52,7 +66,7 @@ export default async function PoolsPage() {
               return (
                 <Link
                   key={p.id}
-                  href={`/p/${p.slug}/invite`}
+                  href={poolHref(p.slug, p.status)}
                   style={{
                     display: "block",
                     padding: 13,

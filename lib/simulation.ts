@@ -16,7 +16,6 @@ import { getCurrentRegularSeasonWeek, getWeekScoreboard } from "./espn";
 import { getNfeloRatings, type NfeloRating } from "./nfelo";
 import { getFpiRatings } from "./fpi";
 import { rostersFromPicks, type Pick } from "./draft";
-import { MANAGER_NAMES } from "./managers";
 
 const TIE_PROBABILITY = 0.006; // ~1 in 165 games — roughly the modern-NFL tie rate
 const DEFAULT_TRIALS = 20000;
@@ -58,19 +57,21 @@ export type SimulationSummary = {
 };
 
 /** Shared Monte Carlo engine — takes a precomputed home-win probability per game, independent
- * of which rating system produced it. */
+ * of which rating system produced it. `roster` is the pool's manager list (a userId in v2, a
+ * name in the legacy single-tenant path) so everyone appears even before they've picked. */
 async function simulateSeason(
   picks: Pick[],
+  roster: string[],
   games: { home: string; away: string; pHomeWin: number }[],
   year: number,
   model: string,
   trials: number,
 ): Promise<SimulationSummary> {
-  const rosters = rostersFromPicks(picks);
-  const managerRoster = MANAGER_NAMES.map((m) => ({ manager: m, teams: rosters[m] ?? [] }));
+  const rosters = rostersFromPicks(picks, roster);
+  const managerRoster = roster.map((m) => ({ manager: m, teams: rosters[m] ?? [] }));
   const winsSamples: Record<string, number[]> = {};
   const poolWinCredits: Record<string, number> = {};
-  for (const m of MANAGER_NAMES) {
+  for (const m of roster) {
     winsSamples[m] = new Array(trials);
     poolWinCredits[m] = 0;
   }
@@ -104,7 +105,7 @@ async function simulateSeason(
       winsSamples[manager][t] = total;
       if (total > best) best = total;
     }
-    const winners = MANAGER_NAMES.filter((m) => totals[m] === best);
+    const winners = roster.filter((m) => totals[m] === best);
     for (const w of winners) poolWinCredits[w] += 1 / winners.length;
   }
 
@@ -155,7 +156,7 @@ export async function attachWinProbabilitiesElo<T extends { home: string; away: 
   }));
 }
 
-export async function runSimulationElo(picks: Pick[], trials = DEFAULT_TRIALS): Promise<SimulationSummary> {
+export async function runSimulationElo(picks: Pick[], roster: string[], trials = DEFAULT_TRIALS): Promise<SimulationSummary> {
   const { year } = await getCurrentRegularSeasonWeek();
   const [schedule, ratings] = await Promise.all([getFullSeasonSchedule(year), getNfeloRatings()]);
   const games = schedule.map((g) => ({
@@ -163,7 +164,7 @@ export async function runSimulationElo(picks: Pick[], trials = DEFAULT_TRIALS): 
     away: g.away,
     pHomeWin: eloWinProbability(ratedElo(g.home, ratings) + ELO_HOME_FIELD_ADVANTAGE, ratedElo(g.away, ratings)),
   }));
-  return simulateSeason(picks, games, year, "elo-nfelo", trials);
+  return simulateSeason(picks, roster, games, year, "elo-nfelo", trials);
 }
 
 // ── FPI model (lib/fpi.ts) — ACTIVE. See file header. ───────────────────────────────────────
@@ -204,7 +205,7 @@ export async function attachWinProbabilitiesFpi<T extends { home: string; away: 
   }));
 }
 
-export async function runSimulationFpi(picks: Pick[], trials = DEFAULT_TRIALS): Promise<SimulationSummary> {
+export async function runSimulationFpi(picks: Pick[], roster: string[], trials = DEFAULT_TRIALS): Promise<SimulationSummary> {
   const { year } = await getCurrentRegularSeasonWeek();
   const [schedule, ratings] = await Promise.all([getFullSeasonSchedule(year), getFpiRatings()]);
   const games = schedule.map((g) => ({
@@ -212,7 +213,7 @@ export async function runSimulationFpi(picks: Pick[], trials = DEFAULT_TRIALS): 
     away: g.away,
     pHomeWin: fpiWinProbability(ratings[g.home] ?? 0, ratings[g.away] ?? 0),
   }));
-  return simulateSeason(picks, games, year, "fpi", trials);
+  return simulateSeason(picks, roster, games, year, "fpi", trials);
 }
 
 // ── Active model — everything in app/api/* imports these three names. Flip to the *Elo

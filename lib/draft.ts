@@ -1,4 +1,3 @@
-import { MANAGER_NAMES } from "./managers";
 import type { TeamRecord } from "./teams";
 
 // The pool's actual draft pattern (not a simple snake) — the Bill Simmons / Grantland method.
@@ -23,13 +22,16 @@ export function buildDraftOrder(positionOrder: string[]): string[] {
 
 export type Pick = { pickNo: number; manager: string; teamAb: string };
 
-export function rostersFromPicks(picks: Pick[]): Record<string, string[]> {
+/** `roster` fixes which keys appear in the result (and their order) even before they've picked
+ * anything -- pass the pool's manager list so a manager with 0 picks still shows an empty
+ * array instead of being absent. Defaults to whatever managers appear in `picks` themselves. */
+export function rostersFromPicks(picks: Pick[], roster?: string[]): Record<string, string[]> {
   const rosters: Record<string, string[]> = {};
-  for (const name of MANAGER_NAMES) rosters[name] = [];
+  const keys = roster ?? Array.from(new Set(picks.map((p) => p.manager)));
+  for (const key of keys) rosters[key] = [];
   for (const p of picks) {
-    // A pick's manager can be stale relative to a since-changed roster/pattern; skip rather
-    // than crash. The commissioner can "Reset draft" if that ever actually happens.
-    if (rosters[p.manager]) rosters[p.manager].push(p.teamAb);
+    // A pick's manager can be stale relative to a since-changed roster; skip rather than crash.
+    if (p.manager in rosters) rosters[p.manager].push(p.teamAb);
   }
   return rosters;
 }

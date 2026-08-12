@@ -54,8 +54,8 @@ export type GradeRow = {
 
 /** Sums each manager's drafted teams' projected wins per source, sorted best-average first.
  * Managers with fewer than 3 picks so far are still included — their totals just aren't final. */
-export function computeGrades(picks: Pick[]): GradeRow[] {
-  const rosters = rostersFromPicks(picks);
+export function computeGrades(picks: Pick[], roster?: string[]): GradeRow[] {
+  const rosters = rostersFromPicks(picks, roster);
   const rows: GradeRow[] = Object.entries(rosters).map(([manager, teams]) => {
     const bySource = {} as Record<OddsSource, number>;
     for (const source of ODDS_SOURCES) {
