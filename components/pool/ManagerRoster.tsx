@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { TeamLogo } from "@/components/TeamLogo";
+import { SettingsGearLink } from "@/components/pool/SettingsGearLink";
 import { TEAM } from "@/lib/teams";
 import { totalWins } from "@/lib/draft";
 import { useStandings } from "@/lib/live-data";
@@ -15,7 +16,19 @@ function fmtWins(w: number) {
 /** A manager's 3 drafted teams, with live/projected wins and pool win probability. Shared by
  * the "My teams" tab (viewing yourself) and /manager/[userId] (viewing anyone) so the two can
  * never drift out of sync with each other. */
-export function ManagerRoster({ slug, userId, teams, title }: { slug: string; userId: string; teams: string[]; title: string }) {
+export function ManagerRoster({
+  slug,
+  userId,
+  teams,
+  title,
+  isCommissioner,
+}: {
+  slug: string;
+  userId: string;
+  teams: string[];
+  title: string;
+  isCommissioner: boolean;
+}) {
   const router = useRouter();
   const { standings, loading } = useStandings();
   const { results: simResults } = usePoolSimulation(slug);
@@ -26,7 +39,10 @@ export function ManagerRoster({ slug, userId, teams, title }: { slug: string; us
   return (
     <>
       <div style={{ flex: "none", padding: "18px 20px 12px", borderBottom: "1px solid var(--color-divider)" }}>
-        <h4 style={{ margin: 0, fontSize: 19, color: "var(--color-text)" }}>{title}</h4>
+        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
+          <h4 style={{ margin: 0, fontSize: 19, color: "var(--color-text)" }}>{title}</h4>
+          <SettingsGearLink slug={slug} isCommissioner={isCommissioner} />
+        </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 2, marginTop: 3 }}>
           <div style={{ fontSize: 12.5, color: "var(--color-neutral-500)" }}>
             {loading ? "Loading live wins…" : `${fmtWins(wins)} combined wins`}

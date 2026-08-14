@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import type { MemberRow } from "@/lib/pools-server";
+import { SettingsGearLink } from "@/components/pool/SettingsGearLink";
 
 type EmailInvite = { id: string; email: string | null; accepted: boolean };
 
@@ -92,11 +93,7 @@ export function InviteContent({
           <Link href="/pools" className="btn btn-ghost" style={{ paddingLeft: 0, fontSize: 14, display: "inline-flex" }}>
             ← Your pools
           </Link>
-          {isCommissioner && (
-            <Link href={`/p/${slug}/settings`} className="btn btn-ghost btn-icon" style={{ fontSize: 15 }}>
-              ⚙
-            </Link>
-          )}
+          <SettingsGearLink slug={slug} isCommissioner={isCommissioner} />
         </div>
         <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
           <h4 style={{ margin: 0, fontSize: 19, color: "var(--color-text)" }}>{poolName}</h4>

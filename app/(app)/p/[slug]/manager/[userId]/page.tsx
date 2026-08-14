@@ -7,7 +7,7 @@ import { PoolTabBar } from "@/components/pool/PoolTabBar";
 
 export default async function ManagerDetailPage({ params }: { params: Promise<{ slug: string; userId: string }> }) {
   const { slug, userId } = await params;
-  const { user, season } = await requirePostDraftPool(slug);
+  const { user, season, membership } = await requirePostDraftPool(slug);
 
   const [picks, managers] = await Promise.all([getSeasonPicks(season.id), getSeasonManagers(season.id)]);
   const target = managers.find((m) => m.userId === userId);
@@ -38,6 +38,7 @@ export default async function ManagerDetailPage({ params }: { params: Promise<{ 
         userId={userId}
         teams={rosters[userId] ?? []}
         title={mine ? `${target.displayName} (you)` : target.displayName}
+        isCommissioner={membership.role === "commissioner"}
       />
       <PoolTabBar slug={slug} />
     </div>

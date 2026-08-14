@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { TeamLogo } from "@/components/TeamLogo";
 import { PoolTabBar } from "@/components/pool/PoolTabBar";
+import { SettingsGearLink } from "@/components/pool/SettingsGearLink";
 import { TEAM } from "@/lib/teams";
 import { rostersFromPicks, type Pick } from "@/lib/draft";
 import { useWeek } from "@/lib/live-data";
@@ -16,11 +17,13 @@ export function ScheduleContent({
   currentUserId,
   picks,
   managers,
+  isCommissioner,
 }: {
   slug: string;
   currentUserId: string;
   picks: Pick[];
   managers: SeasonManager[];
+  isCommissioner: boolean;
 }) {
   const router = useRouter();
   const [weekOverride, setWeekOverride] = useState<number | null>(null);
@@ -94,6 +97,7 @@ export function ScheduleContent({
         >
           ›
         </button>
+        <SettingsGearLink slug={slug} isCommissioner={isCommissioner} />
       </div>
       <div style={{ flex: 1, overflow: "auto", padding: "8px 12px 14px" }} className="scr">
         <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>

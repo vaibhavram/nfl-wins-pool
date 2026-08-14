@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { TeamLogo } from "@/components/TeamLogo";
 import { SeasonProvider, useSeason } from "@/components/pool/SeasonProvider";
+import { SettingsGearLink } from "@/components/pool/SettingsGearLink";
 import { TEAMS } from "@/lib/teams";
 import { TOTAL_PICKS } from "@/lib/draft";
 import { ODDS_SOURCES, computeGrades } from "@/lib/odds-sources";
@@ -101,11 +102,9 @@ function DraftInner({
         <button className="btn btn-secondary" onClick={() => router.push(`/p/${slug}/lobby`)}>
           Back to lobby
         </button>
-        {isCommissioner && (
-          <Link href={`/p/${slug}/settings`} className="btn btn-ghost" style={{ fontSize: 13.5 }}>
-            Draft settings
-          </Link>
-        )}
+        <Link href={isCommissioner ? `/p/${slug}/settings` : "/account"} className="btn btn-ghost" style={{ fontSize: 13.5 }}>
+          {isCommissioner ? "Draft settings" : "Your account"}
+        </Link>
       </div>
     );
   }
@@ -119,11 +118,7 @@ function DraftInner({
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)" }}>{32 - TOTAL_PICKS} teams go undrafted</div>
-            {isCommissioner && (
-              <Link href={`/p/${slug}/settings`} className="btn btn-ghost btn-icon" style={{ fontSize: 15 }}>
-                ⚙
-              </Link>
-            )}
+            <SettingsGearLink slug={slug} isCommissioner={isCommissioner} />
           </div>
         </div>
         <div

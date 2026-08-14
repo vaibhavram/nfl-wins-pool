@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { TeamLogo } from "@/components/TeamLogo";
 import { PoolTabBar } from "@/components/pool/PoolTabBar";
+import { SettingsGearLink } from "@/components/pool/SettingsGearLink";
 import { TEAM } from "@/lib/teams";
 import { buildDraftOrder, TOTAL_PICKS, type Pick } from "@/lib/draft";
 import { ODDS_SOURCES, computeGrades } from "@/lib/odds-sources";
@@ -16,11 +17,13 @@ export function DraftResultsContent({
   currentUserId,
   picks,
   managers,
+  isCommissioner,
 }: {
   slug: string;
   currentUserId: string;
   picks: Pick[];
   managers: SeasonManager[];
+  isCommissioner: boolean;
 }) {
   const router = useRouter();
   const [view, setView] = useState<"picks" | "grades">("picks");
@@ -49,7 +52,10 @@ export function DraftResultsContent({
   return (
     <div className="app-shell">
       <div style={{ flex: "none", padding: "18px 20px 12px", borderBottom: "1px solid var(--color-divider)" }}>
-        <h4 style={{ margin: 0, fontSize: 19, color: "var(--color-text)" }}>Draft results</h4>
+        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
+          <h4 style={{ margin: 0, fontSize: 19, color: "var(--color-text)" }}>Draft results</h4>
+          <SettingsGearLink slug={slug} isCommissioner={isCommissioner} />
+        </div>
         <div style={{ fontSize: 12, color: "var(--color-neutral-500)" }}>
           {picks.length} of {TOTAL_PICKS} picks · Bill Simmons method
         </div>

@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { TeamLogo } from "@/components/TeamLogo";
 import { PoolTabBar } from "@/components/pool/PoolTabBar";
+import { SettingsGearLink } from "@/components/pool/SettingsGearLink";
 import { TEAM } from "@/lib/teams";
 import { rostersFromPicks, totalWins, type Pick } from "@/lib/draft";
 import { useStandings } from "@/lib/live-data";
@@ -20,11 +21,13 @@ export function StandingsContent({
   currentUserId,
   picks,
   managers,
+  isCommissioner,
 }: {
   slug: string;
   currentUserId: string;
   picks: Pick[];
   managers: SeasonManager[];
+  isCommissioner: boolean;
 }) {
   const router = useRouter();
   const { standings, loading, error } = useStandings();
@@ -61,7 +64,10 @@ export function StandingsContent({
             {loading ? "Loading live standings…" : error ? "Standings unavailable" : "Live standings"} · {managers.length} managers
           </div>
         </div>
-        <div style={{ fontSize: 11.5, color: "var(--color-neutral-600)" }}>Wins</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ fontSize: 11.5, color: "var(--color-neutral-600)" }}>Wins</div>
+          <SettingsGearLink slug={slug} isCommissioner={isCommissioner} />
+        </div>
       </div>
       <div style={{ flex: 1, overflow: "auto", padding: "10px 14px 14px" }} className="scr">
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>

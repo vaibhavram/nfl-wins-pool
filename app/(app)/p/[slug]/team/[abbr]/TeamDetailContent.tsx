@@ -3,11 +3,22 @@
 import { useRouter } from "next/navigation";
 import { TeamLogo } from "@/components/TeamLogo";
 import { PoolTabBar } from "@/components/pool/PoolTabBar";
+import { SettingsGearLink } from "@/components/pool/SettingsGearLink";
 import { TEAM } from "@/lib/teams";
 import { useStandings, useTeamSchedule } from "@/lib/live-data";
 import { formatKickoff, formatWinPct } from "@/lib/format";
 
-export function TeamDetailContent({ slug, abbr, ownerName }: { slug: string; abbr: string; ownerName: string | null }) {
+export function TeamDetailContent({
+  slug,
+  abbr,
+  ownerName,
+  isCommissioner,
+}: {
+  slug: string;
+  abbr: string;
+  ownerName: string | null;
+  isCommissioner: boolean;
+}) {
   const router = useRouter();
   const ab = abbr.toUpperCase();
   const team = TEAM[ab];
@@ -31,10 +42,11 @@ export function TeamDetailContent({ slug, abbr, ownerName }: { slug: string; abb
 
   return (
     <div className="app-shell">
-      <div style={{ padding: "16px 16px 0" }}>
+      <div style={{ padding: "16px 16px 0", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <button className="btn btn-ghost" style={{ paddingLeft: 0, fontSize: 14 }} onClick={() => router.back()}>
           ← Back
         </button>
+        <SettingsGearLink slug={slug} isCommissioner={isCommissioner} />
       </div>
       <div style={{ flex: "none", padding: "8px 20px 14px", borderBottom: "1px solid var(--color-divider)", display: "flex", alignItems: "center", gap: 14 }}>
         <TeamLogo ab={team.ab} size={54} />
