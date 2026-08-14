@@ -38,7 +38,7 @@ function LobbyInner({
   // Everyone gets taken to the draft board automatically the moment the commissioner starts it.
   useEffect(() => {
     if (draftStarted && !draftComplete) router.push(`/p/${slug}/draft`);
-    if (draftComplete) router.push(`/p/${slug}/leaderboard`);
+    if (draftComplete) router.push(`/p/${slug}/standings`);
   }, [draftStarted, draftComplete, router, slug]);
 
   async function onStart() {

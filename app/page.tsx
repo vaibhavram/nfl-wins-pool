@@ -70,7 +70,7 @@ export default async function LandingPage() {
           {[
             ["Start a pool, invite nine friends", "Share one link. They're in as soon as they tap it."],
             ["Draft your three teams", "Take your turn whenever you're free — the draft waits for you."],
-            ["Watch the leaderboard all season", "Scores update as games finish. Every game matters to somebody."],
+            ["Watch the standings all season", "Scores update as games finish. Every game matters to somebody."],
           ].map(([title, body], i) => (
             <div key={title} style={{ display: "flex", gap: 14 }}>
               <div

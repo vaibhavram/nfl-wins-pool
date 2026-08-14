@@ -13,7 +13,7 @@ function poolHref(slug: string, status: PoolCard["status"]): string {
       return `/p/${slug}/draft`;
     case "in_season":
     case "final":
-      return `/p/${slug}/leaderboard`;
+      return `/p/${slug}/standings`;
   }
 }
 

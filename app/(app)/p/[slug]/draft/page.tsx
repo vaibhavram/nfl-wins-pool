@@ -10,7 +10,7 @@ export default async function DraftPage({ params }: { params: Promise<{ slug: st
   if (!season) notFound();
 
   if (season.status === "filling") redirect(`/p/${slug}/invite`);
-  if (season.status === "in_season" || season.status === "final") redirect(`/p/${slug}/leaderboard`);
+  if (season.status === "in_season" || season.status === "final") redirect(`/p/${slug}/standings`);
 
   const [managers, members] = await Promise.all([getSeasonManagers(season.id), getPoolMembers(pool.id)]);
   const commissioner = members.find((m) => m.role === "commissioner");

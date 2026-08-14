@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { requireMember } from "@/lib/auth/require-member";
 import { revokeInvite } from "@/lib/invites-server";
 
@@ -11,5 +12,10 @@ export async function DELETE(_req: Request, ctx: RouteContext<"/api/p/[slug]/inv
   }
 
   await revokeInvite(id, ctxOrError.pool.id);
+  // The invite/settings pages fetch this list as a Server Component prop, so the client-side
+  // Router Cache can otherwise keep showing the revoked invite as "Pending" until it happens to
+  // expire -- invalidate it explicitly so the next visit to either page refetches.
+  revalidatePath(`/p/${slug}/invite`);
+  revalidatePath(`/p/${slug}/settings`);
   return NextResponse.json({ ok: true });
 }

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import type { MemberRow } from "@/lib/pools-server";
 
-type EmailInvite = { id: string; email: string; accepted: boolean };
+type EmailInvite = { id: string; email: string | null; accepted: boolean };
 
 function initials(name: string): string {
   return name
@@ -199,7 +199,7 @@ export function InviteContent({
                 ✉
               </div>
               <div style={{ flex: 1, minWidth: 0, fontSize: 13.5, color: "var(--color-neutral-500)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                {inv.email}
+                {inv.email ?? "Pending invite"}
               </div>
               <div style={{ fontSize: 11.5, color: "var(--color-neutral-600)" }}>Pending</div>
             </div>

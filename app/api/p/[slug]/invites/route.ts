@@ -12,7 +12,11 @@ export async function GET(_req: Request, ctx: RouteContext<"/api/p/[slug]/invite
     getOrCreateShareLink(ctxOrError.pool.id, ctxOrError.user.id),
     listInvites(ctxOrError.pool.id),
   ]);
-  return NextResponse.json({ ok: true, shareLink, emailInvites });
+  // Only the commissioner gets to see who was invited by email -- everyone else just sees that
+  // a seat is pending, same rule as the invite/settings pages.
+  const isCommissioner = ctxOrError.membership.role === "commissioner";
+  const visibleInvites = isCommissioner ? emailInvites : emailInvites.map((i) => ({ ...i, email: null }));
+  return NextResponse.json({ ok: true, shareLink, emailInvites: visibleInvites });
 }
 
 export async function POST(req: Request, ctx: RouteContext<"/api/p/[slug]/invites">) {

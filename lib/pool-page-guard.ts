@@ -7,7 +7,7 @@ export type PoolPageContext = { user: CurrentUser; pool: PoolRow; membership: Me
 
 /** Shared guard for every /p/[slug]/* in-pool screen: signed in, pool exists, caller is a
  * member. Doesn't redirect on season status -- callers decide what a null/early-status season
- * means for their screen (the lobby shows a waiting state; draft/leaderboard/etc. redirect
+ * means for their screen (the lobby shows a waiting state; draft/standings/etc. redirect
  * elsewhere). Mirrors lib/auth/require-member.ts's API-route version, but via redirect/notFound
  * instead of a JSON error. */
 export async function requirePoolMembership(slug: string): Promise<PoolPageContext> {
@@ -24,7 +24,7 @@ export async function requirePoolMembership(slug: string): Promise<PoolPageConte
   return { user, pool, membership, season };
 }
 
-/** For the post-draft screens (leaderboard/schedule/my-teams/draft-results/team/manager detail)
+/** For the post-draft screens (standings/schedule/my-teams/draft-results/team/manager detail)
  * -- everyone belongs somewhere else until the draft's actually done, so this centralizes that
  * redirect chain instead of repeating it on every one of those pages. */
 export async function requirePostDraftPool(slug: string): Promise<PoolPageContext & { season: SeasonRow }> {

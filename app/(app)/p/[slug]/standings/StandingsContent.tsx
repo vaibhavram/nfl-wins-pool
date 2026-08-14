@@ -15,7 +15,7 @@ function fmtWins(w: number) {
   return Number.isInteger(w) ? String(w) : w.toFixed(1);
 }
 
-export function LeaderboardContent({
+export function StandingsContent({
   slug,
   currentUserId,
   picks,
@@ -56,7 +56,7 @@ export function LeaderboardContent({
     <div className="app-shell">
       <div style={{ flex: "none", padding: "18px 20px 12px", display: "flex", alignItems: "flex-end", justifyContent: "space-between", borderBottom: "1px solid var(--color-divider)" }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-          <h4 style={{ margin: 0, fontSize: 19, color: "var(--color-text)" }}>Leaderboard</h4>
+          <h4 style={{ margin: 0, fontSize: 19, color: "var(--color-text)" }}>Standings</h4>
           <div style={{ fontSize: 12, color: "var(--color-neutral-500)" }}>
             {loading ? "Loading live standings…" : error ? "Standings unavailable" : "Live standings"} · {managers.length} managers
           </div>

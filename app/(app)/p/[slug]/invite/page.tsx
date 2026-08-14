@@ -15,6 +15,7 @@ export default async function InvitePage({ params }: { params: Promise<{ slug: s
   const membership = await getMembership(pool.id, user.id);
   if (!membership) redirect("/pools");
 
+  const isCommissioner = membership.role === "commissioner";
   const [members, shareLink, emailInvites] = await Promise.all([
     getPoolMembers(pool.id),
     getOrCreateShareLink(pool.id, user.id),
@@ -27,8 +28,14 @@ export default async function InvitePage({ params }: { params: Promise<{ slug: s
       poolName={pool.name}
       members={members}
       shareToken={shareLink.token}
-      emailInvites={emailInvites.map((i) => ({ id: i.id, email: i.email!, accepted: Boolean(i.accepted_at) }))}
-      isCommissioner={membership.role === "commissioner"}
+      emailInvites={emailInvites.map((i) => ({
+        id: i.id,
+        // Only the commissioner gets to see who was invited by email -- everyone else just
+        // sees that a seat is pending.
+        email: isCommissioner ? i.email! : null,
+        accepted: Boolean(i.accepted_at),
+      }))}
+      isCommissioner={isCommissioner}
     />
   );
 }

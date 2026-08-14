@@ -50,7 +50,7 @@ export function OnboardingForm({
         <div style={{ width: 40, height: 3, background: "var(--color-accent)", borderRadius: 2 }} />
         <h2 style={{ fontSize: 28, margin: 0, color: "var(--color-text)" }}>Tell us about you</h2>
         <p style={{ margin: 0, fontSize: 14, lineHeight: 1.5, color: "var(--color-neutral-400)" }}>
-          This is how you&apos;ll show up on leaderboards and rosters. Takes a second.
+          This is how you&apos;ll show up on standings and rosters. Takes a second.
         </p>
       </div>
       <form onSubmit={onSubmit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>

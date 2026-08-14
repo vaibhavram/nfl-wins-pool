@@ -16,7 +16,7 @@ export default async function ManagerDetailPage({ params }: { params: Promise<{ 
     return (
       <div className="app-shell" style={{ padding: 28 }}>
         <p>Unknown manager.</p>
-        <Link href={`/p/${slug}/leaderboard`} className="btn btn-ghost">
+        <Link href={`/p/${slug}/standings`} className="btn btn-ghost">
           ← Back
         </Link>
       </div>
@@ -29,7 +29,7 @@ export default async function ManagerDetailPage({ params }: { params: Promise<{ 
   return (
     <div className="app-shell">
       <div style={{ padding: "16px 16px 0" }}>
-        <Link href={`/p/${slug}/leaderboard`} className="btn btn-ghost" style={{ paddingLeft: 0, fontSize: 14 }}>
+        <Link href={`/p/${slug}/standings`} className="btn btn-ghost" style={{ paddingLeft: 0, fontSize: 14 }}>
           ← Back
         </Link>
       </div>

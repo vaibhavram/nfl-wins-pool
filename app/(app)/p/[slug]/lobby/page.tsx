@@ -14,7 +14,7 @@ export default async function LobbyPage({ params }: { params: Promise<{ slug: st
   // post-draft tabs instead.
   if (season.status === "filling") redirect(`/p/${slug}/invite`);
   if (season.status === "drafting") redirect(`/p/${slug}/draft`);
-  if (season.status === "in_season" || season.status === "final") redirect(`/p/${slug}/leaderboard`);
+  if (season.status === "in_season" || season.status === "final") redirect(`/p/${slug}/standings`);
 
   const [managers, members] = await Promise.all([getSeasonManagers(season.id), getPoolMembers(pool.id)]);
   const commissioner = members.find((m) => m.role === "commissioner");
