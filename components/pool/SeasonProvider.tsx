@@ -25,6 +25,7 @@ type SeasonContextValue = {
   onClockUserId: string | null;
   draftStarted: boolean;
   draftComplete: boolean;
+  paused: boolean;
   selectTeam: (ab: string | null) => void;
   confirmPick: (teamAb: string) => Promise<PickResult>;
   startDraft: () => Promise<PickResult>;
@@ -40,6 +41,7 @@ type SeasonState = {
   order: string[];
   deadline: string | null;
   pickClockSeconds: number;
+  paused: boolean;
 };
 const EMPTY_STATE: SeasonState = {
   hydrated: false,
@@ -48,6 +50,7 @@ const EMPTY_STATE: SeasonState = {
   order: [],
   deadline: null,
   pickClockSeconds: 43200,
+  paused: false,
 };
 
 export function SeasonProvider({ slug, children }: { slug: string; children: ReactNode }) {
@@ -68,6 +71,7 @@ export function SeasonProvider({ slug, children }: { slug: string; children: Rea
         order: data.order ?? [],
         deadline: data.deadline ?? null,
         pickClockSeconds: data.pickClockSeconds ?? 43200,
+        paused: Boolean(data.paused),
       });
     } catch {
       setState((s) => ({ ...s, hydrated: true }));
@@ -134,6 +138,7 @@ export function SeasonProvider({ slug, children }: { slug: string; children: Rea
         order: data.order ?? [],
         deadline: data.deadline ?? null,
         pickClockSeconds: data.pickClockSeconds ?? 43200,
+        paused: Boolean(data.paused),
       });
       setSelectedTeam(null);
       return { ok: true };
@@ -168,6 +173,7 @@ export function SeasonProvider({ slug, children }: { slug: string; children: Rea
     onClockUserId,
     draftStarted,
     draftComplete,
+    paused: state.paused,
     selectTeam,
     confirmPick,
     startDraft,

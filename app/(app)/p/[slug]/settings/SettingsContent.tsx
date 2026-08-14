@@ -20,6 +20,8 @@ export function SettingsContent({
   slug,
   poolName: initialName,
   draftStarted,
+  draftLive,
+  draftPaused,
   pickClockSeconds: initialPickClockSeconds,
   scheduledDraftAt: initialScheduledDraftAt,
   members: initialMembers,
@@ -29,6 +31,8 @@ export function SettingsContent({
   slug: string;
   poolName: string;
   draftStarted: boolean;
+  draftLive: boolean;
+  draftPaused: boolean;
   pickClockSeconds: number;
   scheduledDraftAt: string | null;
   members: MemberRow[];
@@ -46,8 +50,24 @@ export function SettingsContent({
   const [pickClockSeconds, setPickClockSeconds] = useState(initialPickClockSeconds);
   const [scheduledDraftAt, setScheduledDraftAt] = useState(toLocalInputValue(initialScheduledDraftAt));
   const [savingDraftSettings, setSavingDraftSettings] = useState(false);
+  const [paused, setPaused] = useState(draftPaused);
+  const [pausing, setPausing] = useState(false);
   const draftSettingsDirty =
     pickClockSeconds !== initialPickClockSeconds || scheduledDraftAt !== toLocalInputValue(initialScheduledDraftAt);
+
+  async function togglePause() {
+    setPausing(true);
+    setError(null);
+    const endpoint = paused ? "resume" : "pause";
+    const res = await fetch(`/api/p/${slug}/draft/${endpoint}`, { method: "POST" });
+    const data = await res.json();
+    setPausing(false);
+    if (!data.ok) {
+      setError(data.error ?? `Couldn't ${endpoint} the draft.`);
+      return;
+    }
+    setPaused(!paused);
+  }
 
   async function saveDraftSettings() {
     setSavingDraftSettings(true);
@@ -106,9 +126,9 @@ export function SettingsContent({
   return (
     <>
       <div style={{ flex: "none", padding: "8px 18px 12px", borderBottom: "1px solid var(--color-divider)", display: "flex", alignItems: "center", gap: 10 }}>
-        <Link href={`/p/${slug}/invite`} className="btn btn-ghost" style={{ paddingLeft: 0, fontSize: 14, display: "inline-flex" }}>
+        <button onClick={() => router.back()} className="btn btn-ghost" style={{ paddingLeft: 0, fontSize: 14, display: "inline-flex" }}>
           ←
-        </Link>
+        </button>
         <h4 style={{ margin: 0, fontSize: 18, color: "var(--color-text)" }}>Pool settings</h4>
         <div style={{ marginLeft: "auto", fontSize: 10, letterSpacing: ".08em", textTransform: "uppercase", color: "var(--color-accent-200)", background: "var(--color-accent-900)", borderRadius: 3, padding: "2px 6px" }}>
           Commissioner
@@ -131,7 +151,29 @@ export function SettingsContent({
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           <div style={{ fontSize: 11.5, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--color-neutral-600)" }}>Draft settings</div>
           {draftStarted ? (
-            <div style={{ fontSize: 13, color: "var(--color-neutral-600)" }}>Locked in once the draft starts.</div>
+            draftLive ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <div style={{ width: 6, height: 6, borderRadius: "50%", background: paused ? "var(--color-neutral-600)" : "var(--color-accent)" }} />
+                  <div style={{ fontSize: 13, color: "var(--color-neutral-400)" }}>{paused ? "Draft is paused." : "Draft is live."}</div>
+                </div>
+                <button
+                  className="btn btn-secondary"
+                  style={{ alignSelf: "flex-start", minHeight: 40, paddingInline: 14, fontSize: 13.5 }}
+                  onClick={togglePause}
+                  disabled={pausing}
+                >
+                  {pausing ? "Working…" : paused ? "Resume draft" : "Pause draft"}
+                </button>
+                <div style={{ fontSize: 12, lineHeight: 1.5, color: "var(--color-neutral-600)" }}>
+                  {paused
+                    ? "Nobody can pick until you resume. Whoever's on the clock gets a fresh full window when you do."
+                    : "Pauses the pick clock and blocks new picks -- handy if the draft needs to break mid-session."}
+                </div>
+              </div>
+            ) : (
+              <div style={{ fontSize: 13, color: "var(--color-neutral-600)" }}>Locked in once the draft&apos;s done.</div>
+            )
           ) : (
             <>
               <div className="field">

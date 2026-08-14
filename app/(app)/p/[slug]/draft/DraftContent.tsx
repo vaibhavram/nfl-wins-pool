@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { TeamLogo } from "@/components/TeamLogo";
 import { SeasonProvider, useSeason } from "@/components/pool/SeasonProvider";
 import { TEAMS } from "@/lib/teams";
@@ -25,11 +26,13 @@ function DraftInner({
   currentUserId,
   managers,
   commissionerName,
+  isCommissioner,
 }: {
   slug: string;
   currentUserId: string;
   managers: SeasonManager[];
   commissionerName: string;
+  isCommissioner: boolean;
 }) {
   const router = useRouter();
   const {
@@ -43,6 +46,7 @@ function DraftInner({
     currentPickNo,
     onClockUserId,
     draftComplete,
+    paused,
     selectTeam,
     confirmPick,
   } = useSeason();
@@ -51,7 +55,7 @@ function DraftInner({
   const roster = useMemo(() => managers.map((m) => m.userId), [managers]);
   const displayName = (userId: string | null) => (userId ? (nameByUserId[userId] ?? "Someone") : "");
 
-  const myTurn = !draftComplete && onClockUserId === currentUserId;
+  const myTurn = !draftComplete && !paused && onClockUserId === currentUserId;
   const [pickError, setPickError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [sortMode, setSortMode] = useState<"alpha" | "ou">("alpha");
@@ -97,6 +101,11 @@ function DraftInner({
         <button className="btn btn-secondary" onClick={() => router.push(`/p/${slug}/lobby`)}>
           Back to lobby
         </button>
+        {isCommissioner && (
+          <Link href={`/p/${slug}/settings`} className="btn btn-ghost" style={{ fontSize: 13.5 }}>
+            Draft settings
+          </Link>
+        )}
       </div>
     );
   }
@@ -108,7 +117,14 @@ function DraftInner({
           <div style={{ fontSize: 11.5, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--color-neutral-500)" }}>
             Round {round} · Pick {currentPickNo} of {TOTAL_PICKS}
           </div>
-          <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)" }}>{32 - TOTAL_PICKS} teams go undrafted</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)" }}>{32 - TOTAL_PICKS} teams go undrafted</div>
+            {isCommissioner && (
+              <Link href={`/p/${slug}/settings`} className="btn btn-ghost btn-icon" style={{ fontSize: 15 }}>
+                ⚙
+              </Link>
+            )}
+          </div>
         </div>
         <div
           style={{
@@ -117,9 +133,9 @@ function DraftInner({
             gap: 10,
             padding: "10px 12px",
             borderRadius: "var(--radius-md)",
-            background: myTurn ? "var(--color-accent-900)" : "var(--color-surface)",
-            border: myTurn ? "1px solid var(--color-accent)" : "1px solid var(--color-divider)",
-            boxShadow: myTurn ? "0 0 24px rgba(145,132,217,.22)" : "none",
+            background: paused ? "var(--color-neutral-900)" : myTurn ? "var(--color-accent-900)" : "var(--color-surface)",
+            border: paused ? "1px solid var(--color-neutral-700)" : myTurn ? "1px solid var(--color-accent)" : "1px solid var(--color-divider)",
+            boxShadow: myTurn && !paused ? "0 0 24px rgba(145,132,217,.22)" : "none",
           }}
         >
           <div
@@ -127,9 +143,9 @@ function DraftInner({
               width: 8,
               height: 8,
               borderRadius: "50%",
-              background: myTurn ? "var(--color-accent)" : "var(--color-neutral-600)",
+              background: paused ? "var(--color-neutral-600)" : myTurn ? "var(--color-accent)" : "var(--color-neutral-600)",
               flex: "none",
-              animation: myTurn ? "pulse-dot 1.4s ease-in-out infinite" : "none",
+              animation: myTurn && !paused ? "pulse-dot 1.4s ease-in-out infinite" : "none",
             }}
           />
           <div
@@ -139,15 +155,15 @@ function DraftInner({
               fontSize: 14.5,
               fontFamily: "var(--font-heading)",
               fontWeight: 500,
-              color: myTurn ? "var(--color-accent-200)" : "var(--color-text)",
+              color: paused ? "var(--color-neutral-400)" : myTurn ? "var(--color-accent-200)" : "var(--color-text)",
               whiteSpace: "nowrap",
               overflow: "hidden",
               textOverflow: "ellipsis",
             }}
           >
-            {myTurn ? "You're on the clock" : `Waiting on ${displayName(onClockUserId)}`}
+            {paused ? "Draft paused" : myTurn ? "You're on the clock" : `Waiting on ${displayName(onClockUserId)}`}
           </div>
-          {nextUserId && (
+          {!paused && nextUserId && (
             <div
               style={{
                 flex: "0 1 auto",
@@ -164,6 +180,11 @@ function DraftInner({
             </div>
           )}
         </div>
+        {paused && (
+          <div style={{ fontSize: 11.5, color: "var(--color-neutral-500)" }}>
+            {isCommissioner ? "Resume it from Settings when you're ready." : "The commissioner paused the draft. Sit tight."}
+          </div>
+        )}
         {remaining && !draftComplete && (
           <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11.5, color: "var(--color-neutral-500)" }}>
             <span>Auto-pick in</span>
@@ -403,7 +424,8 @@ function DraftInner({
                         {displayName(takenBy ?? null)}
                       </div>
                     ) : (
-                      isSel && (
+                      isSel &&
+                      !paused && (
                         <button
                           className="btn btn-primary"
                           style={{ flex: "none", minHeight: 36, paddingInline: 16, fontSize: 13 }}
@@ -433,6 +455,7 @@ export function DraftContent(props: {
   currentUserId: string;
   managers: SeasonManager[];
   commissionerName: string;
+  isCommissioner: boolean;
 }) {
   return (
     <SeasonProvider slug={props.slug}>

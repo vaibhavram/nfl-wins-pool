@@ -6,7 +6,7 @@ import { DraftContent } from "./DraftContent";
 
 export default async function DraftPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const { user, pool, season } = await requirePoolMembership(slug);
+  const { user, pool, season, membership } = await requirePoolMembership(slug);
   if (!season) notFound();
 
   if (season.status === "filling") redirect(`/p/${slug}/invite`);
@@ -21,6 +21,7 @@ export default async function DraftPage({ params }: { params: Promise<{ slug: st
       currentUserId={user.id}
       managers={managers}
       commissionerName={commissioner?.display_name ?? pool.name}
+      isCommissioner={membership.role === "commissioner"}
     />
   );
 }

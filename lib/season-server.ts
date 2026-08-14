@@ -28,7 +28,7 @@ export async function getSeasonManagers(seasonId: string): Promise<SeasonManager
 
 async function logEvent(
   seasonId: string,
-  eventType: "start" | "pick" | "auto_pick",
+  eventType: "start" | "pick" | "auto_pick" | "pause" | "resume",
   fields: { pickNo?: number; userId?: string; teamAb?: string } = {},
 ): Promise<void> {
   await query("INSERT INTO season_events (season_id, event_type, pick_no, user_id, team_ab) VALUES ($1, $2, $3, $4, $5)", [
@@ -40,14 +40,44 @@ async function logEvent(
   ]);
 }
 
-type SeasonStatusRow = { status: string; pick_clock_seconds: number; draft_started_at: string | null };
+type SeasonStatusRow = {
+  status: string;
+  pick_clock_seconds: number;
+  draft_started_at: string | null;
+  paused_at: string | null;
+  clock_reset_at: string | null;
+};
 
 async function getSeasonStatus(seasonId: string): Promise<SeasonStatusRow | null> {
   const rows = await query<SeasonStatusRow>(
-    "SELECT status, pick_clock_seconds, draft_started_at FROM pool_seasons WHERE id = $1",
+    "SELECT status, pick_clock_seconds, draft_started_at, paused_at, clock_reset_at FROM pool_seasons WHERE id = $1",
     [seasonId],
   );
   return rows[0] ?? null;
+}
+
+export type PauseResult = { ok: true } | { ok: false; error: string };
+
+export async function pauseDraft(seasonId: string): Promise<PauseResult> {
+  const season = await getSeasonStatus(seasonId);
+  if (!season) return { ok: false, error: "Season not found." };
+  if (season.status !== "drafting") return { ok: false, error: "The draft isn't running right now." };
+  if (season.paused_at) return { ok: true }; // already paused -- idempotent
+  await query("UPDATE pool_seasons SET paused_at = now() WHERE id = $1", [seasonId]);
+  await logEvent(seasonId, "pause");
+  return { ok: true };
+}
+
+/** Resuming gives whoever's on the clock a fresh full pick-clock window (clock_reset_at),
+ * rather than trying to preserve exact remaining time across the pause. */
+export async function resumeDraft(seasonId: string): Promise<PauseResult> {
+  const season = await getSeasonStatus(seasonId);
+  if (!season) return { ok: false, error: "Season not found." };
+  if (season.status !== "drafting") return { ok: false, error: "The draft isn't running right now." };
+  if (!season.paused_at) return { ok: true }; // already running -- idempotent
+  await query("UPDATE pool_seasons SET paused_at = NULL, clock_reset_at = now() WHERE id = $1", [seasonId]);
+  await logEvent(seasonId, "resume");
+  return { ok: true };
 }
 
 /** Commissioner-only (checked by the route) -- only legal from 'ready', i.e. once the pool has
@@ -79,8 +109,11 @@ function bestAvailableTeam(takenAbs: Set<string>): string {
 }
 
 /** When the slot at `pickCount` (0-indexed picks made so far) went on the clock — the previous
- * pick's timestamp, or the draft's start time for the very first pick. Null if not started. */
+ * pick's timestamp, or the draft's start time for the very first pick. Null if not started.
+ * `clock_reset_at` (set on resume from a pause) overrides this for whichever pick is currently
+ * on the clock, giving them a fresh full window instead of an already-expired one. */
 async function clockStartedAt(seasonId: string, pickCount: number, season: SeasonStatusRow): Promise<Date | null> {
+  if (season.clock_reset_at) return new Date(season.clock_reset_at);
   if (pickCount === 0) {
     return season.draft_started_at ? new Date(season.draft_started_at) : null;
   }
@@ -91,7 +124,10 @@ async function clockStartedAt(seasonId: string, pickCount: number, season: Seaso
   return rows[0] ? new Date(rows[0].created_at) : null;
 }
 
+/** No deadline at all while paused -- no countdown to show, and resolveOverduePicks won't
+ * auto-pick for anyone until the commissioner resumes. */
 async function getCurrentDeadline(seasonId: string, season: SeasonStatusRow, picks: Pick[]): Promise<string | null> {
+  if (season.paused_at) return null;
   if (picks.length >= TOTAL_PICKS) return null;
   const startedAt = await clockStartedAt(seasonId, picks.length, season);
   if (!startedAt) return null;
@@ -104,7 +140,7 @@ async function getCurrentDeadline(seasonId: string, season: SeasonStatusRow, pic
 async function resolveOverduePicks(seasonId: string): Promise<void> {
   for (let guard = 0; guard < TOTAL_PICKS; guard++) {
     const season = await getSeasonStatus(seasonId);
-    if (!season || season.status !== "drafting") return;
+    if (!season || season.status !== "drafting" || season.paused_at) return;
     const picks = await getSeasonPicks(seasonId);
     if (picks.length >= TOTAL_PICKS) return;
     const startedAt = await clockStartedAt(seasonId, picks.length, season);
@@ -127,6 +163,8 @@ async function resolveOverduePicks(seasonId: string): Promise<void> {
       throw err;
     }
     await logEvent(seasonId, "auto_pick", { pickNo, userId: onClock, teamAb });
+    // That pick's clock_reset_at override (if any) only applied to this now-filled slot.
+    await query("UPDATE pool_seasons SET clock_reset_at = NULL WHERE id = $1", [seasonId]);
     if (pickNo === TOTAL_PICKS) {
       await query("UPDATE pool_seasons SET status = 'in_season', draft_completed_at = now() WHERE id = $1", [seasonId]);
     }
@@ -145,6 +183,9 @@ export async function submitPick(seasonId: string, userId: string, teamAb: strin
   const season = await getSeasonStatus(seasonId);
   if (!season || season.status !== "drafting") {
     return { ok: false, error: "The draft isn't running right now.", status: 403 };
+  }
+  if (season.paused_at) {
+    return { ok: false, error: "The draft is paused.", status: 403 };
   }
   const [picks, draftOrder] = await Promise.all([getSeasonPicks(seasonId), getDraftOrder(seasonId)]);
   if (picks.length >= TOTAL_PICKS) {
@@ -173,6 +214,7 @@ export async function submitPick(seasonId: string, userId: string, teamAb: strin
     throw err;
   }
   await logEvent(seasonId, "pick", { pickNo, userId, teamAb });
+  await query("UPDATE pool_seasons SET clock_reset_at = NULL WHERE id = $1", [seasonId]);
   if (pickNo === TOTAL_PICKS) {
     await query("UPDATE pool_seasons SET status = 'in_season', draft_completed_at = now() WHERE id = $1", [seasonId]);
   }
@@ -185,6 +227,7 @@ export type DraftStatePayload = {
   order: string[];
   deadline: string | null;
   pickClockSeconds: number;
+  paused: boolean;
 };
 
 /** Called by the state-polling endpoint (and after every pick) so overdue auto-picks land even
@@ -192,8 +235,15 @@ export type DraftStatePayload = {
 export async function getFullState(seasonId: string): Promise<DraftStatePayload> {
   await resolveOverduePicks(seasonId);
   const season = await getSeasonStatus(seasonId);
-  if (!season) return { picks: [], status: "filling", order: [], deadline: null, pickClockSeconds: 43200 };
+  if (!season) return { picks: [], status: "filling", order: [], deadline: null, pickClockSeconds: 43200, paused: false };
   const [picks, order] = await Promise.all([getSeasonPicks(seasonId), getDraftOrder(seasonId)]);
   const deadline = await getCurrentDeadline(seasonId, season, picks);
-  return { picks, status: season.status, order, deadline, pickClockSeconds: season.pick_clock_seconds };
+  return {
+    picks,
+    status: season.status,
+    order,
+    deadline,
+    pickClockSeconds: season.pick_clock_seconds,
+    paused: Boolean(season.paused_at),
+  };
 }

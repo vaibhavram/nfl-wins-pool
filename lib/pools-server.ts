@@ -41,6 +41,7 @@ export type SeasonRow = {
   scheduled_draft_at: string | null;
   draft_started_at: string | null;
   draft_completed_at: string | null;
+  paused_at: string | null;
 };
 
 export type MemberRow = {

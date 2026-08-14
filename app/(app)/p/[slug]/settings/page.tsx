@@ -23,6 +23,8 @@ export default async function SettingsPage({ params }: { params: Promise<{ slug:
       slug={slug}
       poolName={pool.name}
       draftStarted={season?.status !== "filling" && season?.status !== "ready"}
+      draftLive={season?.status === "drafting"}
+      draftPaused={Boolean(season?.paused_at)}
       pickClockSeconds={season?.pick_clock_seconds ?? 43200}
       scheduledDraftAt={season?.scheduled_draft_at ?? null}
       members={members.filter((m) => m.role !== "commissioner")}
