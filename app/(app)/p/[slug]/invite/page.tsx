@@ -28,13 +28,15 @@ export default async function InvitePage({ params }: { params: Promise<{ slug: s
       poolName={pool.name}
       members={members}
       shareToken={shareLink.token}
-      emailInvites={emailInvites.map((i) => ({
-        id: i.id,
-        // Only the commissioner gets to see who was invited by email -- everyone else just
-        // sees that a seat is pending.
-        email: isCommissioner ? i.email! : null,
-        accepted: Boolean(i.accepted_at),
-      }))}
+      emailInvites={emailInvites
+        .filter((i) => !i.revoked_at)
+        .map((i) => ({
+          id: i.id,
+          // Only the commissioner gets to see who was invited by email -- everyone else just
+          // sees that a seat is pending.
+          email: isCommissioner ? i.email! : null,
+          accepted: Boolean(i.accepted_at),
+        }))}
       isCommissioner={isCommissioner}
     />
   );

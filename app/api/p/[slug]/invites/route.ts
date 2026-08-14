@@ -8,10 +8,11 @@ export async function GET(_req: Request, ctx: RouteContext<"/api/p/[slug]/invite
   const ctxOrError = await requireMember(slug);
   if ("error" in ctxOrError) return NextResponse.json({ ok: false, error: ctxOrError.error }, { status: ctxOrError.status });
 
-  const [shareLink, emailInvites] = await Promise.all([
+  const [shareLink, allInvites] = await Promise.all([
     getOrCreateShareLink(ctxOrError.pool.id, ctxOrError.user.id),
     listInvites(ctxOrError.pool.id),
   ]);
+  const emailInvites = allInvites.filter((i) => !i.revoked_at);
   // Only the commissioner gets to see who was invited by email -- everyone else just sees that
   // a seat is pending, same rule as the invite/settings pages.
   const isCommissioner = ctxOrError.membership.role === "commissioner";
