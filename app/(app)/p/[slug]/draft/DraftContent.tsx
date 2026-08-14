@@ -132,10 +132,37 @@ function DraftInner({
               animation: myTurn ? "pulse-dot 1.4s ease-in-out infinite" : "none",
             }}
           />
-          <div style={{ flex: 1, fontSize: 14.5, fontFamily: "var(--font-heading)", fontWeight: 500, color: myTurn ? "var(--color-accent-200)" : "var(--color-text)" }}>
+          <div
+            style={{
+              flex: 1,
+              minWidth: 0,
+              fontSize: 14.5,
+              fontFamily: "var(--font-heading)",
+              fontWeight: 500,
+              color: myTurn ? "var(--color-accent-200)" : "var(--color-text)",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
+          >
             {myTurn ? "You're on the clock" : `Waiting on ${displayName(onClockUserId)}`}
           </div>
-          {nextUserId && <div style={{ fontSize: 11.5, color: "var(--color-accent-400)" }}>{displayName(nextUserId)} is next</div>}
+          {nextUserId && (
+            <div
+              style={{
+                flex: "0 1 auto",
+                minWidth: 0,
+                maxWidth: "40%",
+                fontSize: 11.5,
+                color: "var(--color-accent-400)",
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
+            >
+              {displayName(nextUserId)} is next
+            </div>
+          )}
         </div>
         {remaining && !draftComplete && (
           <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11.5, color: "var(--color-neutral-500)" }}>

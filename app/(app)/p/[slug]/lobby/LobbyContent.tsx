@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { SeasonProvider, useSeason } from "@/components/pool/SeasonProvider";
 import { usePoolPresence } from "@/lib/client/pool-live-data";
 import { SignOutButton } from "@/components/SignOutButton";
@@ -53,7 +54,14 @@ function LobbyInner({
   return (
     <div className="app-shell" style={{ padding: "0 0 0" }}>
       <div style={{ padding: "20px 20px 4px", display: "flex", flexDirection: "column", gap: 3 }}>
-        <h4 style={{ margin: 0, fontSize: 19, color: "var(--color-text)" }}>Draft lobby</h4>
+        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
+          <h4 style={{ margin: 0, fontSize: 19, color: "var(--color-text)" }}>Draft lobby</h4>
+          {isCommissioner && (
+            <Link href={`/p/${slug}/settings`} className="btn btn-ghost btn-icon" style={{ fontSize: 15 }}>
+              ⚙
+            </Link>
+          )}
+        </div>
         <div style={{ fontSize: 12.5, color: "var(--color-neutral-500)" }}>3 rounds · 10 managers</div>
       </div>
       <div

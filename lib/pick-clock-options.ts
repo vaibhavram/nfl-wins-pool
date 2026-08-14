@@ -13,3 +13,18 @@ export const PICK_CLOCK_OPTIONS: { label: string; seconds: number }[] = [
 ];
 
 export const PICK_CLOCK_OPTIONS_SECONDS = new Set(PICK_CLOCK_OPTIONS.map((o) => o.seconds));
+
+// A fast dev/testing-only option -- not something a real pool would ever want, so it's hidden
+// unless you're signed in as this specific username, both in the UI and in the API validation.
+const DEV_USERNAME = "vaibhav";
+const DEV_PICK_CLOCK_OPTION = { label: "10 sec", seconds: 10 };
+
+export function pickClockOptionsFor(username: string | null | undefined): { label: string; seconds: number }[] {
+  return username === DEV_USERNAME ? [DEV_PICK_CLOCK_OPTION, ...PICK_CLOCK_OPTIONS] : PICK_CLOCK_OPTIONS;
+}
+
+export function isValidPickClockSeconds(seconds: unknown, username: string | null | undefined): boolean {
+  if (typeof seconds !== "number") return false;
+  if (PICK_CLOCK_OPTIONS_SECONDS.has(seconds)) return true;
+  return username === DEV_USERNAME && seconds === DEV_PICK_CLOCK_OPTION.seconds;
+}

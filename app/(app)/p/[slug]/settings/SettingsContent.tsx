@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { MemberRow } from "@/lib/pools-server";
-import { PICK_CLOCK_OPTIONS } from "@/lib/pick-clock-options";
+import { pickClockOptionsFor } from "@/lib/pick-clock-options";
 
 type PendingInvite = { id: string; email: string };
 
@@ -24,6 +24,7 @@ export function SettingsContent({
   scheduledDraftAt: initialScheduledDraftAt,
   members: initialMembers,
   pendingInvites: initialInvites,
+  username,
 }: {
   slug: string;
   poolName: string;
@@ -32,8 +33,10 @@ export function SettingsContent({
   scheduledDraftAt: string | null;
   members: MemberRow[];
   pendingInvites: PendingInvite[];
+  username: string | null;
 }) {
   const router = useRouter();
+  const pickClockOptions = pickClockOptionsFor(username);
   const [name, setName] = useState(initialName);
   const [savingName, setSavingName] = useState(false);
   const [members, setMembers] = useState(initialMembers);
@@ -134,7 +137,7 @@ export function SettingsContent({
               <div className="field">
                 <label>Pick clock</label>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                  {PICK_CLOCK_OPTIONS.map((opt) => {
+                  {pickClockOptions.map((opt) => {
                     const active = opt.seconds === pickClockSeconds;
                     return (
                       <button

@@ -2,6 +2,14 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { OnboardingForm } from "./OnboardingForm";
 
+/** Matches the API's USERNAME_PATTERN (3-20 chars: letters, numbers, underscores) so the
+ * suggested default is always something the form can submit as-is. */
+function suggestUsername(email: string | null): string {
+  if (!email) return "";
+  const local = email.split("@")[0].toLowerCase().replace(/[^a-z0-9_]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "");
+  return local.slice(0, 20);
+}
+
 export default async function OnboardingPage({
   searchParams,
 }: {
@@ -16,7 +24,7 @@ export default async function OnboardingPage({
     <OnboardingForm
       redirectTo={redirectTo ?? "/pools"}
       initialDisplayName={user.displayName}
-      initialUsername={user.username ?? ""}
+      initialUsername={user.username ?? suggestUsername(user.email)}
       initialPhone={user.phone ?? ""}
     />
   );

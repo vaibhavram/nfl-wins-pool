@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireMember } from "@/lib/auth/require-member";
 import { getCurrentSeason, updateDraftSettings } from "@/lib/pools-server";
-import { PICK_CLOCK_OPTIONS_SECONDS } from "@/lib/pick-clock-options";
+import { isValidPickClockSeconds } from "@/lib/pick-clock-options";
 
 export async function PATCH(req: Request, ctx: RouteContext<"/api/p/[slug]/draft-settings">) {
   const { slug } = await ctx.params;
@@ -18,7 +18,7 @@ export async function PATCH(req: Request, ctx: RouteContext<"/api/p/[slug]/draft
   const updates: { pickClockSeconds?: number; scheduledDraftAt?: string | null } = {};
 
   if (body?.pickClockSeconds !== undefined) {
-    if (!PICK_CLOCK_OPTIONS_SECONDS.has(body.pickClockSeconds)) {
+    if (!isValidPickClockSeconds(body.pickClockSeconds, ctxOrError.user.username)) {
       return NextResponse.json({ ok: false, error: "Invalid pick clock duration." }, { status: 400 });
     }
     updates.pickClockSeconds = body.pickClockSeconds;

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { createPool } from "@/lib/pools-server";
-import { PICK_CLOCK_OPTIONS_SECONDS } from "@/lib/pick-clock-options";
+import { isValidPickClockSeconds } from "@/lib/pick-clock-options";
 
 export async function POST(req: Request) {
   const user = await getCurrentUser();
@@ -9,7 +9,7 @@ export async function POST(req: Request) {
 
   const body = await req.json().catch(() => null);
   const name = typeof body?.name === "string" ? body.name.trim() : "";
-  const pickClockSeconds = PICK_CLOCK_OPTIONS_SECONDS.has(body?.pickClockSeconds) ? body.pickClockSeconds : 43200;
+  const pickClockSeconds = isValidPickClockSeconds(body?.pickClockSeconds, user.username) ? body.pickClockSeconds : 43200;
 
   if (!name) return NextResponse.json({ ok: false, error: "Give your pool a name." }, { status: 400 });
   if (name.length > 60) return NextResponse.json({ ok: false, error: "Pool name is too long." }, { status: 400 });

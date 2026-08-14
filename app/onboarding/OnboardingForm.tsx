@@ -61,7 +61,7 @@ export function OnboardingForm({
             className="input"
             type="text"
             autoComplete="name"
-            placeholder="Vaibhav"
+            placeholder="Your name"
             value={displayName}
             onChange={(e) => setDisplayName(e.target.value)}
             autoFocus
@@ -75,7 +75,7 @@ export function OnboardingForm({
             className="input"
             type="text"
             autoComplete="off"
-            placeholder="vaibhav"
+            placeholder="yourname"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             maxLength={20}

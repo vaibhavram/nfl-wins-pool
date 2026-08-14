@@ -27,6 +27,7 @@ export default async function SettingsPage({ params }: { params: Promise<{ slug:
       scheduledDraftAt={season?.scheduled_draft_at ?? null}
       members={members.filter((m) => m.role !== "commissioner")}
       pendingInvites={invites.filter((i) => !i.accepted_at && !i.revoked_at).map((i) => ({ id: i.id, email: i.email! }))}
+      username={user.username}
     />
   );
 }
