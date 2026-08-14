@@ -7,7 +7,7 @@ import { OnboardingForm } from "./OnboardingForm";
 function suggestUsername(email: string | null): string {
   if (!email) return "";
   const local = email.split("@")[0].toLowerCase().replace(/[^a-z0-9_]/g, "_").replace(/_+/g, "_").replace(/^_|_$/g, "");
-  return local.slice(0, 20);
+  return local.slice(0, 20).replace(/^_|_$/g, "");
 }
 
 export default async function OnboardingPage({
