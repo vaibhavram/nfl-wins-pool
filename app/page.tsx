@@ -31,17 +31,17 @@ export default async function LandingPage() {
         >
           <div style={{ width: 44, height: 3, background: "var(--color-accent)", borderRadius: 2 }} />
           <h2 style={{ margin: 0, fontFamily: "var(--font-heading)", fontSize: 32, lineHeight: 1.15, fontWeight: 500, color: "var(--color-text)" }}>
-            Draft three NFL teams. Add up their wins.
+            Draft your teams. Watch them win.
           </h2>
           <p style={{ margin: 0, fontSize: 15.5, lineHeight: 1.55, color: "var(--color-neutral-400)" }}>
-            The whole season in one number. Run a pool with your friends and watch the standings move every Sunday.
+            No setting lineups. No waiver wire. You get the fun of drafting without the headache of managing.
           </p>
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             <Link href="/sign-in" className="btn btn-primary btn-block" style={{ minHeight: 48, fontSize: 15 }}>
-              Get started
+              Start your pool
             </Link>
             <div style={{ fontSize: 12, color: "var(--color-neutral-600)", textAlign: "center" }}>
-              Free · email link to sign in, no password
+              Email to sign in, no password
             </div>
           </div>
         </div>
@@ -52,7 +52,7 @@ export default async function LandingPage() {
           </div>
           <p style={{ margin: 0, fontSize: 14.5, lineHeight: 1.6, color: "var(--color-neutral-300)" }}>
             You draft NFL <em style={{ fontStyle: "normal", color: "var(--color-accent-200)" }}>teams</em>, not players. No
-            lineups to set, no waiver wire, nothing to check on Tuesday morning. Every regular-season win your three teams
+            lineups to set or waiver wire throughout the season. Every regular-season win your three teams
             collect counts toward your total, and the highest total at the end of Week 18 wins the pool.
           </p>
           <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.6, color: "var(--color-neutral-500)" }}>
@@ -60,16 +60,16 @@ export default async function LandingPage() {
             <a href="https://grantland.com/the-triangle/you-should-have-an-nfl-wins-pool/" target="_blank" rel="noopener noreferrer">
               You Should Have an NFL Wins Pool
             </a>
-            . This is that pool, run for you.
+            .
           </p>
         </div>
 
         <div style={{ padding: "26px 22px", borderTop: "1px solid var(--color-divider)", display: "flex", flexDirection: "column", gap: 16 }}>
           <div style={{ fontSize: 11.5, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--color-neutral-600)" }}>How it works</div>
           {[
-            ["Start a pool, invite nine friends", "Share one link. They're in as soon as they tap it."],
-            ["Draft your three teams", "Take your turn whenever you're free — the draft waits for you."],
-            ["Watch the standings all season", "Scores update as games finish. Every game matters to somebody."],
+            ["Start a pool, invite your friends", "Share a link so your friends can join with one tap"],
+            ["Draft your teams", "With live or slow drafts, pick a format that works for your pool"],
+            ["Watch the standings all season", "Root for your teams as they play each. Scores update as games finish. "],
           ].map(([title, body], i) => (
             <div key={title} style={{ display: "flex", gap: 14 }}>
               <div
@@ -134,8 +134,7 @@ export default async function LandingPage() {
             </div>
           ))}
           <div style={{ fontSize: 12.5, lineHeight: 1.5, color: "var(--color-neutral-600)" }}>
-            One format, no settings to argue about. The draft order isn&apos;t a plain snake — it&apos;s balanced so an
-            early first pick costs you later.
+            One format, no settings to argue about. The draft order is balanced so that every manager has an even chance to win.
           </div>
         </div>
 
