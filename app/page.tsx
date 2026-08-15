@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/current-user";
+import { Crest } from "@/components/Crest";
 
 export default async function LandingPage() {
   const user = await getCurrentUser();
@@ -10,10 +11,8 @@ export default async function LandingPage() {
     <div className="app-shell">
       <div style={{ flex: "none", padding: "16px 22px", display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid var(--color-divider)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
-          <div style={{ width: 22, height: 22, borderRadius: 6, border: "1px solid var(--color-accent)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, color: "var(--color-accent-200)" }}>
-            W
-          </div>
-          <div style={{ fontFamily: "var(--font-heading)", fontSize: 14.5, color: "var(--color-text)" }}>NFL Wins Pool</div>
+          <Crest size={24} />
+          <div style={{ fontFamily: "var(--font-heading)", fontSize: 14.5, color: "var(--color-text)" }}>The Wins Pool</div>
         </div>
         <Link href="/sign-in" className="btn btn-ghost" style={{ fontSize: 13, padding: "6px 10px" }}>
           Sign in
