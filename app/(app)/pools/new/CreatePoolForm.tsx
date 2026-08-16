@@ -131,11 +131,22 @@ export function CreatePoolForm({ username }: { username: string | null }) {
               How every pool runs
             </div>
             {[
-              "10 managers, 3 picks each — 30 teams go, 2 don't.",
-              "Draft order follows the Grantland method: the order shifts round to round so an early first pick costs you later.",
-              "Total regular-season wins decides it. Ties count half.",
-            ].map((line) => (
-              <div key={line} style={{ display: "flex", gap: 9, fontSize: 13.5, lineHeight: 1.45, color: "var(--color-neutral-300)" }}>
+              <>10 managers, 3 picks each — 30 teams go, 2 don&apos;t.</>,
+              <>
+                Draft order follows the{" "}
+                <a
+                  href="https://grantland.com/the-triangle/you-should-have-an-nfl-wins-pool/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ color: "var(--color-accent-300)" }}
+                >
+                  Grantland method
+                </a>
+                : the order shifts round to round so an early first pick costs you later.
+              </>,
+              <>Total regular-season wins decides it. Ties count half.</>,
+            ].map((line, i) => (
+              <div key={i} style={{ display: "flex", gap: 9, fontSize: 13.5, lineHeight: 1.45, color: "var(--color-neutral-300)" }}>
                 <span style={{ color: "var(--color-accent-400)" }}>·</span>
                 <span>{line}</span>
               </div>

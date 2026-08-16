@@ -22,6 +22,7 @@ export default async function LobbyPage({ params }: { params: Promise<{ slug: st
   return (
     <LobbyContent
       slug={slug}
+      poolName={pool.name}
       currentUserId={user.id}
       isCommissioner={membership.role === "commissioner"}
       managers={managers}

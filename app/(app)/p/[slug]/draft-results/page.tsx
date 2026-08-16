@@ -4,13 +4,14 @@ import { DraftResultsContent } from "./DraftResultsContent";
 
 export default async function DraftResultsPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const { user, season, membership } = await requirePostDraftPool(slug);
+  const { user, pool, season, membership } = await requirePostDraftPool(slug);
 
   const [picks, managers] = await Promise.all([getSeasonPicks(season.id), getSeasonManagers(season.id)]);
 
   return (
     <DraftResultsContent
       slug={slug}
+      poolName={pool.name}
       currentUserId={user.id}
       picks={picks}
       managers={managers}

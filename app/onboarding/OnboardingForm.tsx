@@ -98,7 +98,7 @@ export function OnboardingForm({
         <button
           className="btn btn-primary btn-block"
           type="submit"
-          disabled={!displayName.trim() || !username.trim() || submitting}
+          disabled={!displayName.trim() || !username.trim() || !phone.trim() || submitting}
         >
           {submitting ? "Saving…" : "Continue"}
         </button>

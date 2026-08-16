@@ -3,8 +3,9 @@
 import { useRouter } from "next/navigation";
 import { TeamLogo } from "@/components/TeamLogo";
 import { SettingsGearLink } from "@/components/pool/SettingsGearLink";
+import { PoolSwitcher } from "@/components/pool/PoolSwitcher";
 import { TEAM } from "@/lib/teams";
-import { totalWins } from "@/lib/draft";
+import { totalWins, TOTAL_PICKS } from "@/lib/draft";
 import { useStandings } from "@/lib/live-data";
 import { usePoolSimulation } from "@/lib/client/pool-live-data";
 import { formatWinPct } from "@/lib/format";
@@ -18,14 +19,18 @@ function fmtWins(w: number) {
  * never drift out of sync with each other. */
 export function ManagerRoster({
   slug,
+  poolName,
   userId,
   teams,
+  draftReceipt,
   title,
   isCommissioner,
 }: {
   slug: string;
+  poolName: string;
   userId: string;
   teams: string[];
+  draftReceipt: { teamAb: string; pickNo: number }[];
   title: string;
   isCommissioner: boolean;
 }) {
@@ -38,7 +43,10 @@ export function ManagerRoster({
 
   return (
     <>
-      <div style={{ flex: "none", padding: "18px 20px 12px", borderBottom: "1px solid var(--color-divider)" }}>
+      <div style={{ flex: "none", padding: "12px 20px 0" }}>
+        <PoolSwitcher slug={slug} poolName={poolName} />
+      </div>
+      <div style={{ flex: "none", padding: "10px 20px 12px", borderBottom: "1px solid var(--color-divider)" }}>
         <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
           <h4 style={{ margin: 0, fontSize: 19, color: "var(--color-text)" }}>{title}</h4>
           <SettingsGearLink slug={slug} isCommissioner={isCommissioner} />
@@ -81,14 +89,55 @@ export function ManagerRoster({
                     {team.div} · O/U {team.ou.toFixed(1)}
                   </div>
                 </div>
-                <div style={{ fontFamily: "var(--font-heading)", fontSize: 22, color: "var(--color-text)" }}>
-                  {rec ? fmtWins(rec.wins + rec.ties * 0.5) : "–"}
+                <div style={{ fontFamily: "var(--font-heading)", fontSize: 20, color: "var(--color-text)" }}>
+                  {rec ? `${rec.wins}–${rec.losses}${rec.ties ? `–${rec.ties}` : ""}` : "–"}
                 </div>
                 <div style={{ fontSize: 16, color: "var(--color-neutral-600)" }}>›</div>
               </div>
             );
           })}
         </div>
+
+        {draftReceipt.length > 0 && (
+          <div style={{ marginTop: 20, display: "flex", flexDirection: "column", gap: 8 }}>
+            <div style={{ fontSize: 11.5, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--color-neutral-600)" }}>
+              Draft receipt
+            </div>
+            <div
+              style={{
+                border: "1px solid var(--color-divider)",
+                borderRadius: "var(--radius-md)",
+                background: "var(--color-surface)",
+                overflow: "hidden",
+              }}
+            >
+              {[...draftReceipt]
+                .sort((a, b) => a.pickNo - b.pickNo)
+                .map((p, i, arr) => {
+                  const team = TEAM[p.teamAb];
+                  const round = Math.floor((p.pickNo - 1) / 10) + 1;
+                  return (
+                    <div
+                      key={p.pickNo}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 10,
+                        padding: "10px 12px",
+                        borderBottom: i < arr.length - 1 ? "1px solid var(--color-divider)" : "none",
+                      }}
+                    >
+                      <TeamLogo ab={p.teamAb} size={22} />
+                      <div style={{ flex: 1, fontSize: 13.5, color: "var(--color-text)" }}>{team?.full ?? p.teamAb}</div>
+                      <div style={{ fontSize: 12, fontFamily: "ui-monospace,monospace", color: "var(--color-neutral-500)" }}>
+                        Round {round} · Pick {p.pickNo} of {TOTAL_PICKS}
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+          </div>
+        )}
       </div>
     </>
   );

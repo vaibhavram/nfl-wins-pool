@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { TeamLogo } from "@/components/TeamLogo";
 import { PoolTabBar } from "@/components/pool/PoolTabBar";
 import { SettingsGearLink } from "@/components/pool/SettingsGearLink";
+import { PoolSwitcher } from "@/components/pool/PoolSwitcher";
 import { TEAM } from "@/lib/teams";
 import { rostersFromPicks, totalWins, type Pick } from "@/lib/draft";
 import { useStandings } from "@/lib/live-data";
@@ -18,12 +19,14 @@ function fmtWins(w: number) {
 
 export function StandingsContent({
   slug,
+  poolName,
   currentUserId,
   picks,
   managers,
   isCommissioner,
 }: {
   slug: string;
+  poolName: string;
   currentUserId: string;
   picks: Pick[];
   managers: SeasonManager[];
@@ -57,7 +60,10 @@ export function StandingsContent({
 
   return (
     <div className="app-shell">
-      <div style={{ flex: "none", padding: "18px 20px 12px", display: "flex", alignItems: "flex-end", justifyContent: "space-between", borderBottom: "1px solid var(--color-divider)" }}>
+      <div style={{ flex: "none", padding: "12px 20px 0" }}>
+        <PoolSwitcher slug={slug} poolName={poolName} />
+      </div>
+      <div style={{ flex: "none", padding: "8px 20px 12px", display: "flex", alignItems: "flex-end", justifyContent: "space-between", borderBottom: "1px solid var(--color-divider)" }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
           <h4 style={{ margin: 0, fontSize: 19, color: "var(--color-text)" }}>Standings</h4>
           <div style={{ fontSize: 12, color: "var(--color-neutral-500)" }}>
@@ -123,6 +129,7 @@ export function StandingsContent({
                 <div style={{ fontFamily: "var(--font-heading)", fontSize: 22, fontWeight: 500, color: mine ? "var(--color-accent-200)" : "var(--color-text)" }}>
                   {fmtWins(r.wins)}
                 </div>
+                <div style={{ fontSize: 16, color: "var(--color-neutral-600)", flex: "none" }}>›</div>
               </div>
             );
           })}

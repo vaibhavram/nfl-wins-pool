@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { TeamLogo } from "@/components/TeamLogo";
 import { PoolTabBar } from "@/components/pool/PoolTabBar";
+import { PoolSwitcher } from "@/components/pool/PoolSwitcher";
 import { SettingsGearLink } from "@/components/pool/SettingsGearLink";
 import { TEAM } from "@/lib/teams";
 import { buildDraftOrder, TOTAL_PICKS, type Pick } from "@/lib/draft";
@@ -14,12 +15,14 @@ type RoundPick = { pickNo: number; userId: string; teamAb: string | null };
 
 export function DraftResultsContent({
   slug,
+  poolName,
   currentUserId,
   picks,
   managers,
   isCommissioner,
 }: {
   slug: string;
+  poolName: string;
   currentUserId: string;
   picks: Pick[];
   managers: SeasonManager[];
@@ -51,7 +54,10 @@ export function DraftResultsContent({
 
   return (
     <div className="app-shell">
-      <div style={{ flex: "none", padding: "18px 20px 12px", borderBottom: "1px solid var(--color-divider)" }}>
+      <div style={{ flex: "none", padding: "12px 20px 0" }}>
+        <PoolSwitcher slug={slug} poolName={poolName} />
+      </div>
+      <div style={{ flex: "none", padding: "8px 20px 12px", borderBottom: "1px solid var(--color-divider)" }}>
         <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
           <h4 style={{ margin: 0, fontSize: 19, color: "var(--color-text)" }}>Draft results</h4>
           <SettingsGearLink slug={slug} isCommissioner={isCommissioner} />

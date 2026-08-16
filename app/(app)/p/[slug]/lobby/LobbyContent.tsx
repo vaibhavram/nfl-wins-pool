@@ -6,17 +6,20 @@ import { SeasonProvider, useSeason } from "@/components/pool/SeasonProvider";
 import { usePoolPresence } from "@/lib/client/pool-live-data";
 import { SignOutButton } from "@/components/SignOutButton";
 import { SettingsGearLink } from "@/components/pool/SettingsGearLink";
+import { PoolSwitcher } from "@/components/pool/PoolSwitcher";
 import { buildDraftOrder } from "@/lib/draft";
 import type { SeasonManager } from "@/lib/season-server";
 
 function LobbyInner({
   slug,
+  poolName,
   currentUserId,
   isCommissioner,
   managers,
   commissionerName,
 }: {
   slug: string;
+  poolName: string;
   currentUserId: string;
   isCommissioner: boolean;
   managers: SeasonManager[];
@@ -53,7 +56,10 @@ function LobbyInner({
 
   return (
     <div className="app-shell" style={{ padding: "0 0 0" }}>
-      <div style={{ padding: "20px 20px 4px", display: "flex", flexDirection: "column", gap: 3 }}>
+      <div style={{ padding: "14px 20px 0" }}>
+        <PoolSwitcher slug={slug} poolName={poolName} />
+      </div>
+      <div style={{ padding: "10px 20px 4px", display: "flex", flexDirection: "column", gap: 3 }}>
         <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
           <h4 style={{ margin: 0, fontSize: 19, color: "var(--color-text)" }}>Draft lobby</h4>
           <SettingsGearLink slug={slug} isCommissioner={isCommissioner} />
@@ -193,6 +199,7 @@ function LobbyInner({
 
 export function LobbyContent(props: {
   slug: string;
+  poolName: string;
   currentUserId: string;
   isCommissioner: boolean;
   managers: SeasonManager[];

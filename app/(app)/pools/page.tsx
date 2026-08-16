@@ -1,40 +1,14 @@
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth/current-user";
-import { getUserPools, type PoolCard } from "@/lib/dashboard-server";
+import { getUserPools, getUserArchivedSeasons } from "@/lib/dashboard-server";
+import { poolHref, statusLabel } from "@/lib/pool-status";
 import { SignOutButton } from "@/components/SignOutButton";
-
-function poolHref(slug: string, status: PoolCard["status"]): string {
-  switch (status) {
-    case "filling":
-      return `/p/${slug}/invite`;
-    case "ready":
-      return `/p/${slug}/lobby`;
-    case "drafting":
-      return `/p/${slug}/draft`;
-    case "in_season":
-    case "final":
-      return `/p/${slug}/standings`;
-  }
-}
-
-function statusLabel(status: PoolCard["status"], memberCount: number): { label: string; color: string } {
-  switch (status) {
-    case "filling":
-      return { label: `${memberCount}/10 joined`, color: "var(--color-neutral-400)" };
-    case "ready":
-      return { label: "Ready to draft", color: "var(--color-accent-300)" };
-    case "drafting":
-      return { label: "Drafting", color: "var(--color-accent-300)" };
-    case "in_season":
-      return { label: "In season", color: "var(--color-accent-300)" };
-    case "final":
-      return { label: "Final", color: "var(--color-neutral-500)" };
-  }
-}
 
 export default async function PoolsPage() {
   const user = await getCurrentUser();
-  const pools = user ? await getUserPools(user.id) : [];
+  const [pools, archived] = user
+    ? await Promise.all([getUserPools(user.id), getUserArchivedSeasons(user.id)])
+    : [[], []];
 
   return (
     <>
@@ -62,7 +36,7 @@ export default async function PoolsPage() {
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {pools.map((p) => {
-              const { label, color } = statusLabel(p.status, p.memberCount);
+              const { label, color } = statusLabel(p);
               return (
                 <Link
                   key={p.id}
@@ -99,6 +73,40 @@ export default async function PoolsPage() {
               );
             })}
           </div>
+        )}
+
+        {archived.length > 0 && (
+          <details style={{ marginTop: 16 }}>
+            <summary style={{ fontSize: 12, letterSpacing: ".08em", textTransform: "uppercase", color: "var(--color-neutral-500)", cursor: "pointer" }}>
+              Past seasons ({archived.length})
+            </summary>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 10 }}>
+              {archived.map((p) => {
+                const { label } = statusLabel(p);
+                return (
+                  <Link
+                    key={`${p.id}-${p.seasonYear}`}
+                    href={poolHref(p.slug, p.status)}
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      padding: "10px 13px",
+                      borderRadius: "var(--radius-md)",
+                      border: "1px dashed var(--color-neutral-800)",
+                      fontSize: 13,
+                      color: "var(--color-neutral-400)",
+                      textDecoration: "none",
+                    }}
+                  >
+                    <span>
+                      {p.name} · {p.seasonYear}
+                    </span>
+                    <span>{label}</span>
+                  </Link>
+                );
+              })}
+            </div>
+          </details>
         )}
       </div>
       <div

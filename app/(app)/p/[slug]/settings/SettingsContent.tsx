@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { MemberRow } from "@/lib/pools-server";
 import { pickClockOptionsFor } from "@/lib/pick-clock-options";
+import { PoolSwitcher } from "@/components/pool/PoolSwitcher";
 
 type PendingInvite = { id: string; email: string };
 
@@ -134,6 +135,9 @@ export function SettingsContent({
           Commissioner
         </div>
       </div>
+      <div style={{ flex: "none", padding: "10px 18px 0" }}>
+        <PoolSwitcher slug={slug} poolName={initialName} />
+      </div>
 
       <div style={{ flex: 1, overflow: "auto", padding: "14px 18px 18px", display: "flex", flexDirection: "column", gap: 20 }} className="scr">
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -144,6 +148,27 @@ export function SettingsContent({
               {savingName ? "Saving…" : "Save"}
             </button>
           </div>
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <div style={{ fontSize: 11.5, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--color-neutral-600)" }}>Your account</div>
+          <Link
+            href="/account"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              padding: "11px 12px",
+              borderRadius: "var(--radius-md)",
+              background: "var(--color-surface)",
+              border: "1px solid var(--color-divider)",
+              fontSize: 13.5,
+              color: "var(--color-text)",
+            }}
+          >
+            <span>Edit your name &amp; username</span>
+            <span style={{ color: "var(--color-neutral-600)" }}>›</span>
+          </Link>
         </div>
 
         {error && <div style={{ fontSize: 12.5, color: "var(--color-accent-300)" }}>{error}</div>}

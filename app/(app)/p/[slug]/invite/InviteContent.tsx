@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import type { MemberRow } from "@/lib/pools-server";
 import { SettingsGearLink } from "@/components/pool/SettingsGearLink";
+import { PoolSwitcher } from "@/components/pool/PoolSwitcher";
 
 type EmailInvite = { id: string; email: string | null; accepted: boolean };
 
@@ -90,9 +90,7 @@ export function InviteContent({
     <>
       <div style={{ flex: "none", padding: "10px 20px 14px", borderBottom: "1px solid var(--color-divider)", display: "flex", flexDirection: "column", gap: 10 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <Link href="/pools" className="btn btn-ghost" style={{ paddingLeft: 0, fontSize: 14, display: "inline-flex" }}>
-            ← Your pools
-          </Link>
+          <PoolSwitcher slug={slug} poolName={poolName} />
           <SettingsGearLink slug={slug} isCommissioner={isCommissioner} />
         </div>
         <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>

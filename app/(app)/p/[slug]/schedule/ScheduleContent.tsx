@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { TeamLogo } from "@/components/TeamLogo";
 import { PoolTabBar } from "@/components/pool/PoolTabBar";
 import { SettingsGearLink } from "@/components/pool/SettingsGearLink";
+import { PoolSwitcher } from "@/components/pool/PoolSwitcher";
 import { TEAM } from "@/lib/teams";
 import { rostersFromPicks, type Pick } from "@/lib/draft";
 import { useWeek } from "@/lib/live-data";
@@ -14,12 +15,14 @@ import type { SeasonManager } from "@/lib/season-server";
 
 export function ScheduleContent({
   slug,
+  poolName,
   currentUserId,
   picks,
   managers,
   isCommissioner,
 }: {
   slug: string;
+  poolName: string;
   currentUserId: string;
   picks: Pick[];
   managers: SeasonManager[];
@@ -51,6 +54,9 @@ export function ScheduleContent({
   if (error) {
     return (
       <div className="app-shell">
+        <div style={{ flex: "none", padding: "12px 20px 0" }}>
+          <PoolSwitcher slug={slug} poolName={poolName} />
+        </div>
         <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: 28, textAlign: "center", color: "var(--color-neutral-500)" }}>
           Couldn&apos;t load the schedule from ESPN right now.
         </div>
@@ -61,6 +67,9 @@ export function ScheduleContent({
   if (!data) {
     return (
       <div className="app-shell">
+        <div style={{ flex: "none", padding: "12px 20px 0" }}>
+          <PoolSwitcher slug={slug} poolName={poolName} />
+        </div>
         <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--color-neutral-500)" }}>Loading schedule…</div>
         <PoolTabBar slug={slug} />
       </div>
@@ -76,7 +85,10 @@ export function ScheduleContent({
 
   return (
     <div className="app-shell">
-      <div style={{ flex: "none", padding: "10px 14px 12px", borderBottom: "1px solid var(--color-divider)", display: "flex", alignItems: "center", gap: 10 }}>
+      <div style={{ flex: "none", padding: "12px 20px 0" }}>
+        <PoolSwitcher slug={slug} poolName={poolName} />
+      </div>
+      <div style={{ flex: "none", padding: "8px 14px 12px", borderBottom: "1px solid var(--color-divider)", display: "flex", alignItems: "center", gap: 10 }}>
         <button
           className="btn btn-secondary btn-icon"
           style={{ flex: "none" }}

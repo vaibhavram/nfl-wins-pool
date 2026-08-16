@@ -101,6 +101,19 @@ async function getDraftOrder(seasonId: string): Promise<string[]> {
   return buildDraftOrder(managers.map((m) => m.userId));
 }
 
+/** Read-only "who's on the clock right now" for dashboard/switcher display -- deliberately does
+ * NOT call resolveOverduePicks, so a dashboard read never triggers an auto-pick write. The
+ * result can lag reality by however long it's been since anyone last opened the draft board
+ * itself (which does resolve overdue picks), which is an acceptable tradeoff for a status label. */
+export async function getOnClockManager(seasonId: string): Promise<{ userId: string; displayName: string } | null> {
+  const [picks, managers] = await Promise.all([getSeasonPicks(seasonId), getSeasonManagers(seasonId)]);
+  if (managers.length !== 10 || picks.length >= TOTAL_PICKS) return null;
+  const order = buildDraftOrder(managers.map((m) => m.userId));
+  const onClockUserId = order[picks.length];
+  const manager = managers.find((m) => m.userId === onClockUserId);
+  return manager ? { userId: manager.userId, displayName: manager.displayName } : null;
+}
+
 /** Highest Vegas win-total team still available — the auto-pick fallback for a blown deadline. */
 function bestAvailableTeam(takenAbs: Set<string>): string {
   const available = TEAMS.filter((t) => !takenAbs.has(t.ab));

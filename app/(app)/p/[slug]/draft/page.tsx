@@ -18,6 +18,7 @@ export default async function DraftPage({ params }: { params: Promise<{ slug: st
   return (
     <DraftContent
       slug={slug}
+      poolName={pool.name}
       currentUserId={user.id}
       managers={managers}
       commissionerName={commissioner?.display_name ?? pool.name}

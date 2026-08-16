@@ -4,7 +4,7 @@ import { TeamDetailContent } from "./TeamDetailContent";
 
 export default async function TeamDetailPage({ params }: { params: Promise<{ slug: string; abbr: string }> }) {
   const { slug, abbr } = await params;
-  const { season, membership } = await requirePostDraftPool(slug);
+  const { pool, season, membership } = await requirePostDraftPool(slug);
 
   const [picks, managers] = await Promise.all([getSeasonPicks(season.id), getSeasonManagers(season.id)]);
   const nameByUserId = Object.fromEntries(managers.map((m) => [m.userId, m.displayName]));
@@ -13,6 +13,7 @@ export default async function TeamDetailPage({ params }: { params: Promise<{ slu
   return (
     <TeamDetailContent
       slug={slug}
+      poolName={pool.name}
       abbr={abbr}
       ownerName={ownerUserId ? (nameByUserId[ownerUserId] ?? null) : null}
       isCommissioner={membership.role === "commissioner"}

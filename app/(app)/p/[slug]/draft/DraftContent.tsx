@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { TeamLogo } from "@/components/TeamLogo";
 import { SeasonProvider, useSeason } from "@/components/pool/SeasonProvider";
 import { SettingsGearLink } from "@/components/pool/SettingsGearLink";
+import { PoolSwitcher } from "@/components/pool/PoolSwitcher";
 import { TEAMS } from "@/lib/teams";
 import { TOTAL_PICKS } from "@/lib/draft";
 import { ODDS_SOURCES, computeGrades } from "@/lib/odds-sources";
@@ -24,12 +25,14 @@ function formatRemaining(deadline: string | null, now: number): string | null {
 
 function DraftInner({
   slug,
+  poolName,
   currentUserId,
   managers,
   commissionerName,
   isCommissioner,
 }: {
   slug: string;
+  poolName: string;
   currentUserId: string;
   managers: SeasonManager[];
   commissionerName: string;
@@ -63,11 +66,18 @@ function DraftInner({
   const [hideDrafted, setHideDrafted] = useState(false);
   const [view, setView] = useState<"board" | "grades">("board");
   const [now, setNow] = useState(() => Date.now());
+  const currentPickRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
   }, []);
+
+  // Auto-scroll the pick ticker to whichever slot is current, so opening the draft board (or a
+  // pick landing) doesn't leave you looking at pick #1 while the action is 20 slots to the right.
+  useEffect(() => {
+    currentPickRef.current?.scrollIntoView({ inline: "center", block: "nearest" });
+  }, [currentPickNo]);
 
   const round = draftComplete ? 3 : Math.floor((currentPickNo - 1) / 10) + 1;
   const nextUserId = !draftComplete && currentPickNo < TOTAL_PICKS ? order[currentPickNo] : null;
@@ -94,7 +104,11 @@ function DraftInner({
   // `hydrated` so this doesn't flash for a moment on every load before the first fetch resolves.
   if (hydrated && !draftStarted && !draftComplete) {
     return (
-      <div className="app-shell" style={{ justifyContent: "center", alignItems: "center", gap: 14, padding: 28, textAlign: "center" }}>
+      <div className="app-shell">
+        <div style={{ padding: "14px 20px 0" }}>
+          <PoolSwitcher slug={slug} poolName={poolName} />
+        </div>
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", gap: 14, padding: 28, textAlign: "center" }}>
         <h3 style={{ margin: 0 }}>Not started yet</h3>
         <p style={{ margin: 0, color: "var(--color-neutral-500)", maxWidth: "32ch" }}>
           Waiting for {commissionerName} to start the draft.
@@ -105,13 +119,17 @@ function DraftInner({
         <Link href={isCommissioner ? `/p/${slug}/settings` : "/account"} className="btn btn-ghost" style={{ fontSize: 13.5 }}>
           {isCommissioner ? "Draft settings" : "Your account"}
         </Link>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="app-shell">
-      <div style={{ flex: "none", padding: "14px 16px 10px", display: "flex", flexDirection: "column", gap: 9, borderBottom: "1px solid var(--color-divider)" }}>
+      <div style={{ flex: "none", padding: "10px 16px 0" }}>
+        <PoolSwitcher slug={slug} poolName={poolName} />
+      </div>
+      <div style={{ flex: "none", padding: "8px 16px 10px", display: "flex", flexDirection: "column", gap: 9, borderBottom: "1px solid var(--color-divider)" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div style={{ fontSize: 11.5, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--color-neutral-500)" }}>
             Round {round} · Pick {currentPickNo} of {TOTAL_PICKS}
@@ -196,9 +214,11 @@ function DraftInner({
             const pick = picks[i];
             const isOnClock = i === currentPickNo - 1;
             const isMine = uid === currentUserId;
+            const isScrollTarget = draftComplete ? i === TOTAL_PICKS - 1 : isOnClock;
             return (
               <div
                 key={i}
+                ref={isScrollTarget ? currentPickRef : undefined}
                 style={{
                   flex: "none",
                   width: 60,
@@ -447,6 +467,7 @@ function DraftInner({
 
 export function DraftContent(props: {
   slug: string;
+  poolName: string;
   currentUserId: string;
   managers: SeasonManager[];
   commissionerName: string;

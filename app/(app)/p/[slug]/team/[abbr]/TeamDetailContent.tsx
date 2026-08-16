@@ -4,17 +4,20 @@ import { useRouter } from "next/navigation";
 import { TeamLogo } from "@/components/TeamLogo";
 import { PoolTabBar } from "@/components/pool/PoolTabBar";
 import { SettingsGearLink } from "@/components/pool/SettingsGearLink";
+import { PoolSwitcher } from "@/components/pool/PoolSwitcher";
 import { TEAM } from "@/lib/teams";
 import { useStandings, useTeamSchedule } from "@/lib/live-data";
 import { formatKickoff, formatWinPct } from "@/lib/format";
 
 export function TeamDetailContent({
   slug,
+  poolName,
   abbr,
   ownerName,
   isCommissioner,
 }: {
   slug: string;
+  poolName: string;
   abbr: string;
   ownerName: string | null;
   isCommissioner: boolean;
@@ -47,6 +50,9 @@ export function TeamDetailContent({
           ← Back
         </button>
         <SettingsGearLink slug={slug} isCommissioner={isCommissioner} />
+      </div>
+      <div style={{ padding: "8px 16px 0" }}>
+        <PoolSwitcher slug={slug} poolName={poolName} />
       </div>
       <div style={{ flex: "none", padding: "8px 20px 14px", borderBottom: "1px solid var(--color-divider)", display: "flex", alignItems: "center", gap: 14 }}>
         <TeamLogo ab={team.ab} size={54} />

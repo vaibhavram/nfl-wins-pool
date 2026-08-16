@@ -21,11 +21,12 @@ export async function POST(req: Request) {
       { status: 400 },
     );
   }
+  if (!phone) return NextResponse.json({ ok: false, error: "Enter your phone number." }, { status: 400 });
 
   try {
     await query(
       "UPDATE users SET display_name = $1, username = $2, phone = $3, onboarded_at = now() WHERE id = $4",
-      [displayName, username, phone || null, user.id],
+      [displayName, username, phone, user.id],
     );
   } catch (err) {
     if ((err as { code?: string }).code === "23505") {
