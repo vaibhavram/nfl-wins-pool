@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/current-user";
-import { isAdminEmail, getAdminStats, getPoolsByStatus, getSignupsByDay, getRecentActivity, getStalledPools } from "@/lib/admin-server";
+import { isAdminEmail, getAdminStats, getPoolsByStatus, getSignupsByDay, getRecentActivity, getStalledPools, getAllPools } from "@/lib/admin-server";
 
 const STATUS_LABELS: Record<string, string> = {
   filling: "Filling",
@@ -30,12 +30,13 @@ export default async function AdminPage() {
   const user = await getCurrentUser();
   if (!user || !isAdminEmail(user.email)) redirect("/pools");
 
-  const [stats, byStatus, signups, activity, stalled] = await Promise.all([
+  const [stats, byStatus, signups, activity, stalled, pools] = await Promise.all([
     getAdminStats(),
     getPoolsByStatus(),
     getSignupsByDay(),
     getRecentActivity(),
     getStalledPools(),
+    getAllPools(),
   ]);
 
   const maxSignupDay = Math.max(1, ...signups.map((d) => d.count));
@@ -94,6 +95,39 @@ export default async function AdminPage() {
                 </div>
                 <div style={{ width: 20, textAlign: "right", fontSize: 12.5, fontFamily: "ui-monospace,monospace", color: "var(--color-text)" }}>
                   {s.count}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <div style={{ fontSize: 11.5, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--color-neutral-600)" }}>
+            Pools ({pools.length})
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {pools.map((p) => (
+              <div
+                key={p.slug}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  padding: "9px 12px",
+                  borderRadius: "var(--radius-md)",
+                  background: "var(--color-surface)",
+                  border: "1px solid var(--color-divider)",
+                }}
+              >
+                <div style={{ flex: 1, fontSize: 13.5, color: "var(--color-text)", minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  {p.name}
+                </div>
+                <div style={{ flex: "none", fontSize: 12.5, color: "var(--color-accent-300)" }}>@{p.creatorUsername}</div>
+                <div style={{ flex: "none", fontSize: 11.5, color: "var(--color-neutral-500)", width: 78, textAlign: "right" }}>
+                  {STATUS_LABELS[p.status] ?? p.status}
+                </div>
+                <div style={{ flex: "none", fontSize: 11.5, color: "var(--color-neutral-600)", width: 42, textAlign: "right", fontFamily: "ui-monospace,monospace" }}>
+                  {p.memberCount}/10
                 </div>
               </div>
             ))}

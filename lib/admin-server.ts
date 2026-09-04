@@ -26,9 +26,14 @@ function testEmailLikePatterns(): string[] {
   return patterns;
 }
 
-/** Pool names that are unambiguously placeholders from manual testing ("Test", "Test 2", ...)
- * rather than someone's actual pool name. */
-const TEST_POOL_NAME_REGEX = "^test( ?[0-9]+)?$";
+/** Pool names that are unambiguously placeholders from manual/scripted testing -- "Test",
+ * "Test 2", "Test2", "Test Pool One", "Playwright Test Pool", etc. Matches "test" bounded by
+ * non-letters (or start/end) rather than Postgres's \y word-boundary, since \y treats digits as
+ * word characters and would miss "Test2". A digit right after "test" still counts as a boundary
+ * here, but a letter doesn't -- so "Contest" and "Testers" aren't caught, since every real pool
+ * name so far describes a group ("... Wins Pool", "All of Divya's friends") rather than
+ * containing the bare word "test". */
+const TEST_POOL_NAME_REGEX = "(^|[^a-z])test([^a-z]|$)";
 
 /** Every user id and pool id that looks like a test artifact rather than real usage -- recomputed
  * on every call (deliberately not cached across requests, so a newly-created test pool is
@@ -175,6 +180,37 @@ export async function getRecentActivity(limit = 20): Promise<ActivityEvent[]> {
 
   events.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
   return events.slice(0, limit);
+}
+
+export type PoolSummary = { slug: string; name: string; creatorUsername: string; status: string; memberCount: number; createdAt: string };
+
+/** One row per real pool -- creator's username (not display name; usernames are the stable,
+ * user-chosen handle, and this is meant for "who actually made this") plus its current season's
+ * status and headcount. Excludes test pools (see getTestExclusions). */
+export async function getAllPools(): Promise<PoolSummary[]> {
+  const { poolIds } = await getTestExclusions();
+  const rows = await query<{ slug: string; name: string; creator_username: string; status: string; member_count: string; created_at: string }>(
+    `SELECT DISTINCT ON (p.id)
+       p.slug, p.name, u.username AS creator_username, ps.status,
+       (SELECT count(*)::text FROM pool_members WHERE pool_id = p.id) AS member_count,
+       p.created_at
+     FROM pools p
+     JOIN users u ON u.id = p.created_by
+     JOIN pool_seasons ps ON ps.pool_id = p.id
+     WHERE p.id <> ALL($1::uuid[])
+     ORDER BY p.id, ps.season_year DESC`,
+    [poolIds],
+  );
+  return rows
+    .map((r) => ({
+      slug: r.slug,
+      name: r.name,
+      creatorUsername: r.creator_username,
+      status: r.status,
+      memberCount: Number(r.member_count),
+      createdAt: r.created_at,
+    }))
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 }
 
 export type StalledPool = { slug: string; name: string; reason: string };
