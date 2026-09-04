@@ -23,7 +23,9 @@ function isValidPayload(body: unknown): body is Payload {
   }
   if (!Array.isArray(b.order) || b.order.length !== TOTAL_MANAGERS || !b.order.every((n) => typeof n === "string")) return false;
   if (!Array.isArray(b.picks) || b.picks.length !== TOTAL_PICKS) return false;
-  if (!Array.isArray(b.roster) || b.roster.length !== TOTAL_MANAGERS) return false;
+  // Roster only needs a phone entry for the 9 non-commissioner managers -- the commissioner maps
+  // to their existing real account via commissionerEmail, no phone/placeholder needed for them.
+  if (!Array.isArray(b.roster) || b.roster.length !== TOTAL_MANAGERS - 1) return false;
   return true;
 }
 
