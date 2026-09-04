@@ -40,7 +40,7 @@ const TEST_POOL_NAME_REGEX = "(^|[^a-z])test([^a-z]|$)";
  * excluded on the very next /admin load, not after a redeploy) and reused by every stat query
  * below so "what counts as a test" only lives in one place. /admin is loaded rarely enough by one
  * person that the handful of extra small queries this costs per page view doesn't matter. */
-async function getTestExclusions(): Promise<{ userIds: string[]; poolIds: string[] }> {
+export async function getTestExclusions(): Promise<{ userIds: string[]; poolIds: string[] }> {
   const patterns = testEmailLikePatterns();
   const userRows = await query<{ id: string }>(
     `SELECT id FROM users WHERE ${patterns.map((_, i) => `email LIKE $${i + 1}`).join(" OR ")}`,
