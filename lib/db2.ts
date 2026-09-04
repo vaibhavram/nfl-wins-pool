@@ -24,3 +24,29 @@ export async function query<T extends Record<string, unknown> = Record<string, u
   const result = await getPool().query(text, params);
   return result.rows as T[];
 }
+
+export type ScopedQuery = <T extends Record<string, unknown> = Record<string, unknown>>(
+  text: string,
+  params?: unknown[],
+) => Promise<T[]>;
+
+/** Runs `fn` inside a single BEGIN/COMMIT, rolling back on any thrown error. Nothing else in
+ * this codebase transacts multi-statement writes (existing call sites are sequential
+ * un-transacted queries) -- this exists for operations where a partial failure would leave
+ * genuinely corrupt state: the legacy-pool migration (~60 rows across 5 tables) and the
+ * onboarding claim-merge (foreign keys repointed across 3 tables). */
+export async function withTransaction<T>(fn: (query: ScopedQuery) => Promise<T>): Promise<T> {
+  const client = await getPool().connect();
+  try {
+    await client.query("BEGIN");
+    const scopedQuery: ScopedQuery = async (text, params) => (await client.query(text, params)).rows;
+    const result = await fn(scopedQuery);
+    await client.query("COMMIT");
+    return result;
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+}

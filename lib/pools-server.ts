@@ -6,7 +6,7 @@ const SLUG_ALPHABET = "abcdefghijkmnpqrstuvwxyz23456789"; // no 0/o/1/l, avoids 
 const SLUG_LENGTH = 10;
 const MAX_SEATS = 10;
 
-function generateSlug(): string {
+export function generateSlug(): string {
   const bytes = randomBytes(SLUG_LENGTH);
   let out = "";
   for (let i = 0; i < SLUG_LENGTH; i++) out += SLUG_ALPHABET[bytes[i] % SLUG_ALPHABET.length];
