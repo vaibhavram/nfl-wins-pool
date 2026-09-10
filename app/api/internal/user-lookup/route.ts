@@ -36,5 +36,15 @@ export async function GET(req: Request) {
     [`%${q}%`],
   );
 
-  return NextResponse.json({ ok: true, users: rows });
+  const users = await Promise.all(
+    rows.map(async (u) => {
+      const memberships = await query<{ pool_name: string; role: string }>(
+        `SELECT p.name AS pool_name, pm.role FROM pool_members pm JOIN pools p ON p.id = pm.pool_id WHERE pm.user_id = $1`,
+        [u.id],
+      );
+      return { ...u, memberships };
+    }),
+  );
+
+  return NextResponse.json({ ok: true, users });
 }
