@@ -52,10 +52,43 @@ export type WeekResponse = {
   byeTeams: string[];
 };
 
+const LIVE_POLL_MS = 20000;
+
+/** While any game in the loaded week is in progress, quietly re-fetches every 20s in the
+ * background -- deliberately bypassing useJsonFetch's `loading` flag (a poll shouldn't flash
+ * "Loading…" every 20 seconds) via a separate `liveData` override that wins once populated.
+ * Self-terminating: once a poll comes back with no more "in" games, `hasLiveGame` goes false on
+ * the next render and the interval isn't renewed. Resets on week change so switching away from
+ * a live week doesn't leave a stale background poll running against the old url. */
 export function useWeek(week: number | null) {
   const url = week === null ? "/api/nfl/week" : `/api/nfl/week?week=${week}`;
   const { data, loading, error } = useJsonFetch<WeekResponse>(url);
-  return { week: data, loading, error };
+  const [liveData, setLiveData] = useState<WeekResponse | null>(null);
+
+  useEffect(() => {
+    // A genuinely new load (different week, or the initial fetch) -- drop any override from
+    // the previous url's background polling.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setLiveData(null);
+  }, [url]);
+
+  const current = liveData ?? data;
+  const hasLiveGame = Boolean(current?.games.some((g) => g.state === "in"));
+
+  useEffect(() => {
+    if (!hasLiveGame) return;
+    const id = setInterval(() => {
+      fetch(url)
+        .then((res) => (res.ok ? res.json() : null))
+        .then((fresh) => {
+          if (fresh) setLiveData(fresh);
+        })
+        .catch(() => {});
+    }, LIVE_POLL_MS);
+    return () => clearInterval(id);
+  }, [hasLiveGame, url]);
+
+  return { week: current, loading, error };
 }
 
 export type SimulationResult = {

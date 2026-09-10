@@ -116,9 +116,14 @@ export function ScheduleContent({
           {games.map((g: WeekGame, i: number) => {
             const away = TEAM[g.away];
             const home = TEAM[g.home];
-            const awayWon = g.completed && (g.awayScore ?? 0) > (g.homeScore ?? 0);
-            const homeWon = g.completed && (g.homeScore ?? 0) > (g.awayScore ?? 0);
+            const scored = g.state !== "pre";
+            const awayLeading = scored && (g.awayScore ?? 0) > (g.homeScore ?? 0);
+            const homeLeading = scored && (g.homeScore ?? 0) > (g.awayScore ?? 0);
             const dim = "var(--color-neutral-600)";
+            // Dim the trailing side once there's a score to compare -- both mid-game and final,
+            // not just final (a live blowout should read the same way a finished one does).
+            const awayColor = scored ? (awayLeading || !homeLeading ? "var(--color-text)" : dim) : "var(--color-text)";
+            const homeColor = scored ? (homeLeading || !awayLeading ? "var(--color-text)" : dim) : "var(--color-text)";
             const mine = myTeams.has(g.away) || myTeams.has(g.home);
             return (
               <div
@@ -139,8 +144,8 @@ export function ScheduleContent({
                   name={away?.full ?? g.away}
                   owner={owners[g.away]}
                   winProb={1 - g.homeWinProb}
-                  score={g.completed ? String(g.awayScore) : ""}
-                  textColor={g.completed ? (awayWon ? "var(--color-text)" : dim) : "var(--color-text)"}
+                  score={scored ? String(g.awayScore) : ""}
+                  textColor={awayColor}
                   onOwnerClick={() => router.push(`/p/${slug}/team/${g.away}`)}
                 />
                 <TeamRow
@@ -148,12 +153,21 @@ export function ScheduleContent({
                   name={home?.full ?? g.home}
                   owner={owners[g.home]}
                   winProb={g.homeWinProb}
-                  score={g.completed ? String(g.homeScore) : ""}
-                  textColor={g.completed ? (homeWon ? "var(--color-text)" : dim) : "var(--color-text)"}
+                  score={scored ? String(g.homeScore) : ""}
+                  textColor={homeColor}
                   onOwnerClick={() => router.push(`/p/${slug}/team/${g.home}`)}
                 />
-                <div style={{ fontSize: 11, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--color-neutral-600)", borderTop: "1px solid var(--color-divider)", paddingTop: 5 }}>
-                  {g.completed ? "Final" : formatKickoff(g.date)}
+                <div
+                  style={{
+                    fontSize: 11,
+                    letterSpacing: ".06em",
+                    textTransform: "uppercase",
+                    color: g.state === "in" ? "var(--color-accent-300)" : "var(--color-neutral-600)",
+                    borderTop: "1px solid var(--color-divider)",
+                    paddingTop: 5,
+                  }}
+                >
+                  {g.state === "in" ? `● Live · ${g.statusDetail}` : g.completed ? "Final" : formatKickoff(g.date)}
                 </div>
               </div>
             );
