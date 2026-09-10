@@ -14,7 +14,11 @@ export async function GET(req: NextRequest) {
   week = Math.min(MAX_WEEK, Math.max(MIN_WEEK, week));
 
   const live = await getWeekScoreboard(week, year);
-  const games = await attachWinProbabilities(live.games);
+  const preGame = await attachWinProbabilities(live.games);
+  // Once a game's actually underway, ESPN's own live win probability (from the same scoreboard
+  // fetch, updated play by play) replaces the static pre-game FPI estimate -- pre/post games
+  // keep the FPI number as before.
+  const games = preGame.map((g) => ({ ...g, homeWinProb: g.liveHomeWinProb ?? g.homeWinProb }));
 
   return NextResponse.json({
     week: live.week,

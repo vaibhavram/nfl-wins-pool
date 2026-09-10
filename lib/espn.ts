@@ -53,6 +53,7 @@ export type LiveGame = {
   completed: boolean;
   state: "pre" | "in" | "post"; // "in" is the live, in-progress state
   statusDetail: string; // e.g. "8:42 - 3rd", "Halftime", "Final" -- ESPN's own short status text
+  liveHomeWinProb: number | null; // ESPN's own live, play-by-play win probability; null before kickoff
   date: string; // ISO kickoff timestamp — client formats it in the viewer's own timezone
 };
 
@@ -71,6 +72,9 @@ type ScoreboardEvent = {
         { homeAway: "home" | "away"; team: { abbreviation: string }; score?: string },
         { homeAway: "home" | "away"; team: { abbreviation: string }; score?: string },
       ];
+      // Present only once a game has kicked off -- ESPN's own live win-probability model,
+      // updated play by play (the same number that drives its live win-probability graph).
+      situation?: { lastPlay?: { probability?: { homeWinPercentage: number } } };
     },
   ];
 };
@@ -100,6 +104,7 @@ export async function getWeekScoreboard(week: number, year: number): Promise<Liv
       completed,
       state,
       statusDetail: ev.status.type.shortDetail,
+      liveHomeWinProb: comp.situation?.lastPlay?.probability?.homeWinPercentage ?? null,
       date: ev.date,
     };
   });
