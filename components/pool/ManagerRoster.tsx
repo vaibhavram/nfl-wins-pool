@@ -64,7 +64,7 @@ export function ManagerRoster({
           </div>
           {sim && (
             <div style={{ fontSize: 12.5, color: "var(--color-accent-400)" }}>
-              {fmtWins(sim.avgWins)} projected wins · {formatWinPct(sim.winPct)}% win prob
+              {fmtWins(sim.avgWins)} proj wins · {formatWinPct(sim.winPct)}% win prob
             </div>
           )}
         </div>
@@ -96,7 +96,7 @@ export function ManagerRoster({
                     <div style={{ fontSize: 15, color: "var(--color-text)" }}>{team.full}</div>
                     <div style={{ fontSize: 12.5, color: "var(--color-neutral-500)" }}>
                       {team.div}
-                      {projectedWins[ab] !== undefined && ` · Projected ${fmtWins(projectedWins[ab])} wins`}
+                      {projectedWins[ab] !== undefined && ` · ${fmtWins(projectedWins[ab])} proj. wins`}
                     </div>
                   </div>
                   <div style={{ fontFamily: "var(--font-heading)", fontSize: 20, color: "var(--color-text)" }}>

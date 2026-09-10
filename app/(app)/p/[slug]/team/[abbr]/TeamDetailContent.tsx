@@ -61,8 +61,7 @@ export function TeamDetailContent({
         <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 3 }}>
           <h4 style={{ margin: 0, fontSize: 20, color: "var(--color-text)" }}>{team.full}</h4>
           <div style={{ fontSize: 12, color: "var(--color-neutral-500)" }}>
-            {team.div}
-            {projected !== undefined && ` · Projected ${formatWins(projected)} wins`} {ownerName && `· ${ownerName}'s team`}
+            {projected !== undefined && `${formatWins(projected)} proj. wins`} {ownerName && `· ${ownerName}'s team`}
           </div>
         </div>
         <div style={{ textAlign: "right" }}>
