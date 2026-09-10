@@ -117,13 +117,6 @@ export function ScheduleContent({
             const away = TEAM[g.away];
             const home = TEAM[g.home];
             const scored = g.state !== "pre";
-            const awayLeading = scored && (g.awayScore ?? 0) > (g.homeScore ?? 0);
-            const homeLeading = scored && (g.homeScore ?? 0) > (g.awayScore ?? 0);
-            const dim = "var(--color-neutral-600)";
-            // Dim the trailing side once there's a score to compare -- both mid-game and final,
-            // not just final (a live blowout should read the same way a finished one does).
-            const awayColor = scored ? (awayLeading || !homeLeading ? "var(--color-text)" : dim) : "var(--color-text)";
-            const homeColor = scored ? (homeLeading || !awayLeading ? "var(--color-text)" : dim) : "var(--color-text)";
             const mine = myTeams.has(g.away) || myTeams.has(g.home);
             return (
               <div
@@ -145,7 +138,6 @@ export function ScheduleContent({
                   owner={owners[g.away]}
                   winProb={1 - g.homeWinProb}
                   score={scored ? String(g.awayScore) : ""}
-                  textColor={awayColor}
                   onOwnerClick={() => router.push(`/p/${slug}/team/${g.away}`)}
                 />
                 <TeamRow
@@ -154,7 +146,6 @@ export function ScheduleContent({
                   owner={owners[g.home]}
                   winProb={g.homeWinProb}
                   score={scored ? String(g.homeScore) : ""}
-                  textColor={homeColor}
                   onOwnerClick={() => router.push(`/p/${slug}/team/${g.home}`)}
                 />
                 <div
@@ -186,7 +177,6 @@ function TeamRow({
   owner,
   winProb,
   score,
-  textColor,
   onOwnerClick,
 }: {
   ab: string;
@@ -194,21 +184,20 @@ function TeamRow({
   owner: string | undefined;
   winProb: number;
   score: string;
-  textColor: string;
   onOwnerClick: () => void;
 }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
       <TeamLogo ab={ab} size={26} />
       <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", cursor: "pointer" }} onClick={onOwnerClick}>
-        <div style={{ fontSize: 13, color: textColor, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{name}</div>
+        <div style={{ fontSize: 13, color: "var(--color-text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{name}</div>
         <div style={{ fontSize: 11.5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
           <span style={{ color: owner ? "var(--color-neutral-500)" : "var(--color-neutral-700)" }}>{owner ?? "undrafted"}</span>
           <span style={{ color: "var(--color-neutral-700)" }}> | </span>
           <span style={{ color: winProb >= 0.5 ? "var(--color-accent-400)" : "var(--color-neutral-600)" }}>{formatWinPct(winProb * 100)}% to win</span>
         </div>
       </div>
-      <div style={{ fontFamily: "ui-monospace,monospace", fontSize: 14, color: textColor }}>{score}</div>
+      <div style={{ fontFamily: "ui-monospace,monospace", fontSize: 14, color: "var(--color-text)" }}>{score}</div>
     </div>
   );
 }
