@@ -189,6 +189,13 @@ a {
 }
 
 /* — scroll — */
+.scr {
+  /* Flex items default to min-height: auto, so a flex:1 + overflow:auto region otherwise grows
+     to fit its content instead of clipping to the space it's given -- which was pushing
+     .app-shell taller than the viewport and dragging the tab bar down with it, off-screen,
+     instead of scrolling internally while the tab bar stays put at the bottom. */
+  min-height: 0;
+}
 .scr::-webkit-scrollbar {
   width: 0;
   height: 0;
@@ -196,7 +203,14 @@ a {
 
 /* — app shell — */
 .app-shell {
-  min-height: 100dvh;
+  /* height, not min-height: the shell itself must never exceed the viewport, or nothing inside
+     it is actually forced to scroll internally (see .scr above) and the tab bar ends up at the
+     bottom of the full page rather than the bottom of the screen. overflow-y is a fallback for
+     the rare short-content page with no .scr region of its own (e.g. /sign-in) whose content
+     somehow exceeds one viewport (tiny screen, zoomed text) -- the shell scrolls as a whole
+     rather than clipping. */
+  height: 100dvh;
+  overflow-y: auto;
   width: 100%;
   display: flex;
   flex-direction: column;
