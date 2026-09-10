@@ -88,6 +88,50 @@ async function getFullSeasonGameData(year: number): Promise<{ games: SimGame[]; 
   return { games: settled, hasLiveGame };
 }
 
+// Resolving the full season (up to ~270 pre-game predictor calls) is shared across every pool
+// and every caller -- keyed only by year, not roster/pool, so runSimulationHybrid and
+// getProjectedWinsByTeam (a team detail page, potentially viewed far more often than the
+// leaderboard) don't each independently re-resolve the same games. Same dynamic TTL the
+// simulate route already uses: short while something's live, long otherwise.
+const SEASON_GAME_DATA_LIVE_TTL_MS = 300_000; // 5 minutes
+const SEASON_GAME_DATA_LONG_TTL_MS = 21_600_000; // 6 hours
+const seasonGameDataCache = new Map<string, { data: { games: SimGame[]; hasLiveGame: boolean }; expiresAt: number }>();
+
+async function getCachedSeasonGameData(year: number): Promise<{ games: SimGame[]; hasLiveGame: boolean }> {
+  const key = String(year);
+  const cached = seasonGameDataCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) return cached.data;
+
+  const data = await getFullSeasonGameData(year);
+  const ttl = data.hasLiveGame ? SEASON_GAME_DATA_LIVE_TTL_MS : SEASON_GAME_DATA_LONG_TTL_MS;
+  seasonGameDataCache.set(key, { data, expiresAt: Date.now() + ttl });
+  return data;
+}
+
+/** Each team's projected wins for the full season: completed games count as 1/0/0.5 (not a
+ * probability), live games use ESPN's live win probability, and games that haven't started yet
+ * use the same hybrid pre-game model as the leaderboard -- summed per team across the whole
+ * schedule, home and away. */
+export async function getProjectedWinsByTeam(): Promise<Record<string, number>> {
+  const { year } = await getCurrentRegularSeasonWeek();
+  const { games } = await getCachedSeasonGameData(year);
+  const projected: Record<string, number> = {};
+  for (const g of games) {
+    let homeShare: number;
+    let awayShare: number;
+    if (g.fixedResult) {
+      homeShare = g.fixedResult === "tie" ? 0.5 : g.fixedResult === "home" ? 1 : 0;
+      awayShare = g.fixedResult === "tie" ? 0.5 : g.fixedResult === "away" ? 1 : 0;
+    } else {
+      homeShare = g.pHomeWin;
+      awayShare = 1 - g.pHomeWin;
+    }
+    projected[g.home] = (projected[g.home] ?? 0) + homeShare;
+    projected[g.away] = (projected[g.away] ?? 0) + awayShare;
+  }
+  return projected;
+}
+
 function quantile(sorted: number[], q: number): number {
   const idx = (sorted.length - 1) * q;
   const lo = Math.floor(idx);
@@ -289,7 +333,7 @@ export async function attachWinProbabilitiesFpi<T extends { home: string; away: 
 
 export async function runSimulationHybrid(picks: Pick[], roster: string[], trials = DEFAULT_TRIALS): Promise<SimulationSummary> {
   const { year } = await getCurrentRegularSeasonWeek();
-  const { games, hasLiveGame } = await getFullSeasonGameData(year);
+  const { games, hasLiveGame } = await getCachedSeasonGameData(year);
   return simulateSeason(picks, roster, games, year, "espn-hybrid", trials, hasLiveGame);
 }
 

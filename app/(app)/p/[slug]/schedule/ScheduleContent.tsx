@@ -6,9 +6,9 @@ import { TeamLogo } from "@/components/TeamLogo";
 import { PoolTabBar } from "@/components/pool/PoolTabBar";
 import { SettingsGearLink } from "@/components/pool/SettingsGearLink";
 import { PoolSwitcher } from "@/components/pool/PoolSwitcher";
-import { TEAM } from "@/lib/teams";
+import { TEAM, type TeamRecord } from "@/lib/teams";
 import { rostersFromPicks, type Pick } from "@/lib/draft";
-import { useWeek } from "@/lib/live-data";
+import { useWeek, useStandings } from "@/lib/live-data";
 import type { WeekGame } from "@/lib/live-data";
 import { formatKickoff, formatWinPct } from "@/lib/format";
 import type { SeasonManager } from "@/lib/season-server";
@@ -31,6 +31,7 @@ export function ScheduleContent({
   const router = useRouter();
   const [weekOverride, setWeekOverride] = useState<number | null>(null);
   const { week: data, loading, error } = useWeek(weekOverride);
+  const { standings } = useStandings();
 
   const nameByUserId = useMemo(() => Object.fromEntries(managers.map((m) => [m.userId, m.displayName])), [managers]);
   const owners: Record<string, string> = {};
@@ -135,6 +136,7 @@ export function ScheduleContent({
                 <TeamRow
                   ab={g.away}
                   name={away?.full ?? g.away}
+                  record={standings[g.away]}
                   owner={owners[g.away]}
                   winProb={1 - g.homeWinProb}
                   score={scored ? String(g.awayScore) : ""}
@@ -144,6 +146,7 @@ export function ScheduleContent({
                 <TeamRow
                   ab={g.home}
                   name={home?.full ?? g.home}
+                  record={standings[g.home]}
                   owner={owners[g.home]}
                   winProb={g.homeWinProb}
                   score={scored ? String(g.homeScore) : ""}
@@ -190,6 +193,7 @@ export function ScheduleContent({
 function TeamRow({
   ab,
   name,
+  record,
   owner,
   winProb,
   score,
@@ -198,17 +202,22 @@ function TeamRow({
 }: {
   ab: string;
   name: string;
+  record: TeamRecord | undefined;
   owner: string | undefined;
   winProb: number;
   score: string;
   hasPossession: boolean;
   onOwnerClick: () => void;
 }) {
+  const recordText = record ? `(${record.wins}-${record.losses}${record.ties ? `-${record.ties}` : ""})` : "";
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
       <TeamLogo ab={ab} size={26} />
       <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", cursor: "pointer" }} onClick={onOwnerClick}>
-        <div style={{ fontSize: 13, color: "var(--color-text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{name}</div>
+        <div style={{ fontSize: 13, color: "var(--color-text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          {name}
+          {recordText && <span style={{ color: "var(--color-neutral-500)" }}> {recordText}</span>}
+        </div>
         <div style={{ fontSize: 11.5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
           <span style={{ color: owner ? "var(--color-neutral-500)" : "var(--color-neutral-700)" }}>{owner ?? "undrafted"}</span>
           <span style={{ color: "var(--color-neutral-700)" }}> | </span>

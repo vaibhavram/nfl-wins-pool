@@ -13,6 +13,12 @@ export function formatWinPct(pct: number): string {
   return pct < 10 ? pct.toFixed(1) : Math.round(pct).toString();
 }
 
+/** A projected/average win total — whole number as-is, one decimal place otherwise (a
+ * probability-weighted sum like projected wins is essentially never a clean integer). */
+export function formatWins(w: number): string {
+  return Number.isInteger(w) ? String(w) : w.toFixed(1);
+}
+
 /** 1 -> "1st", 2 -> "2nd", 3 -> "3rd", 11-13 -> "th" (the standard English exceptions). */
 export function ordinal(n: number): string {
   const mod100 = n % 100;

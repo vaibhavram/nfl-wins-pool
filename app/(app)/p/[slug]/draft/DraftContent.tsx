@@ -10,6 +10,7 @@ import { PoolSwitcher } from "@/components/pool/PoolSwitcher";
 import { TEAMS } from "@/lib/teams";
 import { TOTAL_PICKS } from "@/lib/draft";
 import { ODDS_SOURCES, computeGrades } from "@/lib/odds-sources";
+import { useStandings } from "@/lib/live-data";
 import type { SeasonManager } from "@/lib/season-server";
 
 function formatRemaining(deadline: string | null, now: number): string | null {
@@ -58,6 +59,7 @@ function DraftInner({
   const nameByUserId = useMemo(() => Object.fromEntries(managers.map((m) => [m.userId, m.displayName])), [managers]);
   const roster = useMemo(() => managers.map((m) => m.userId), [managers]);
   const displayName = (userId: string | null) => (userId ? (nameByUserId[userId] ?? "Someone") : "");
+  const { standings } = useStandings();
 
   const myTurn = !draftComplete && !paused && onClockUserId === currentUserId;
   const [pickError, setPickError] = useState<string | null>(null);
@@ -433,6 +435,12 @@ function DraftInner({
                       <div style={{ fontSize: 12, color: "var(--color-neutral-500)" }}>
                         {tm.div} · O/U <span style={{ fontFamily: "ui-monospace,monospace", color: tm.ou >= 10 ? "var(--color-accent-300)" : "var(--color-neutral-400)" }}>{tm.ou.toFixed(1)}</span>
                       </div>
+                    </div>
+                    <div style={{ flex: "none", fontFamily: "ui-monospace,monospace", fontSize: 15, color: "var(--color-neutral-400)" }}>
+                      {(() => {
+                        const rec = standings[tm.ab];
+                        return rec ? `${rec.wins}-${rec.losses}${rec.ties ? `-${rec.ties}` : ""}` : "–";
+                      })()}
                     </div>
                     {isTaken ? (
                       <div style={{ flex: "none", fontSize: 10.5, letterSpacing: ".04em", textTransform: "uppercase", color: "var(--color-neutral-300)", background: "var(--color-neutral-800)", borderRadius: 4, padding: "3px 8px" }}>

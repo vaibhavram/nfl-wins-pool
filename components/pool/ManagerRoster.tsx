@@ -8,11 +8,7 @@ import { TEAM } from "@/lib/teams";
 import { totalWins, TOTAL_PICKS } from "@/lib/draft";
 import { useStandings, useWeek } from "@/lib/live-data";
 import { usePoolSimulation } from "@/lib/client/pool-live-data";
-import { formatWinPct } from "@/lib/format";
-
-function fmtWins(w: number) {
-  return Number.isInteger(w) ? String(w) : w.toFixed(1);
-}
+import { formatWinPct, formatWins as fmtWins } from "@/lib/format";
 
 /** A manager's 3 drafted teams, with live/projected wins and pool win probability. Shared by
  * the "My teams" tab (viewing yourself) and /manager/[userId] (viewing anyone) so the two can

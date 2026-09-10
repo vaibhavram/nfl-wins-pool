@@ -6,8 +6,8 @@ import { PoolTabBar } from "@/components/pool/PoolTabBar";
 import { SettingsGearLink } from "@/components/pool/SettingsGearLink";
 import { PoolSwitcher } from "@/components/pool/PoolSwitcher";
 import { TEAM } from "@/lib/teams";
-import { useStandings, useTeamSchedule } from "@/lib/live-data";
-import { formatKickoff, formatWinPct } from "@/lib/format";
+import { useStandings, useTeamSchedule, useProjectedWins } from "@/lib/live-data";
+import { formatKickoff, formatWinPct, formatWins } from "@/lib/format";
 
 export function TeamDetailContent({
   slug,
@@ -28,7 +28,9 @@ export function TeamDetailContent({
 
   const { standings } = useStandings();
   const { schedule, loading, error } = useTeamSchedule(team ? ab : null);
+  const { projectedWins } = useProjectedWins();
   const rec = standings[ab];
+  const projected = projectedWins[ab];
 
   if (!team) {
     return (
@@ -59,7 +61,8 @@ export function TeamDetailContent({
         <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 3 }}>
           <h4 style={{ margin: 0, fontSize: 20, color: "var(--color-text)" }}>{team.full}</h4>
           <div style={{ fontSize: 12, color: "var(--color-neutral-500)" }}>
-            {team.div} · O/U {team.ou.toFixed(1)} {ownerName && `· ${ownerName}'s team`}
+            {team.div} · {projected !== undefined ? `Projected ${formatWins(projected)} wins` : `O/U ${team.ou.toFixed(1)}`}{" "}
+            {ownerName && `· ${ownerName}'s team`}
           </div>
         </div>
         <div style={{ textAlign: "right" }}>

@@ -40,6 +40,14 @@ export function useStandings() {
   return { standings: data?.standings ?? {}, loading, error };
 }
 
+/** Each team's full-season projected wins (completed games as 1/0/0.5, live games via ESPN's
+ * live win probability, future games via the same hybrid pre-game model the leaderboard uses --
+ * see lib/simulation.ts#getProjectedWinsByTeam). */
+export function useProjectedWins() {
+  const { data, loading, error } = useJsonFetch<{ projectedWins: Record<string, number> }>("/api/nfl/projected-wins");
+  return { projectedWins: data?.projectedWins ?? {}, loading, error };
+}
+
 export type WeekGame = LiveGame & { homeWinProb: number };
 
 export type WeekResponse = {
