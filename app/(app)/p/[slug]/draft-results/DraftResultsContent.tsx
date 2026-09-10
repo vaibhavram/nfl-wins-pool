@@ -9,6 +9,7 @@ import { SettingsGearLink } from "@/components/pool/SettingsGearLink";
 import { TEAM } from "@/lib/teams";
 import { buildDraftOrder, TOTAL_PICKS, type Pick } from "@/lib/draft";
 import { ODDS_SOURCES, computeGrades } from "@/lib/odds-sources";
+import { useStandings } from "@/lib/live-data";
 import type { SeasonManager } from "@/lib/season-server";
 
 type RoundPick = { pickNo: number; userId: string; teamAb: string | null };
@@ -30,6 +31,7 @@ export function DraftResultsContent({
 }) {
   const router = useRouter();
   const [view, setView] = useState<"picks" | "grades">("picks");
+  const { standings } = useStandings();
 
   const roster = useMemo(() => managers.map((m) => m.userId), [managers]);
   const nameByUserId = useMemo(() => Object.fromEntries(managers.map((m) => [m.userId, m.displayName])), [managers]);
@@ -168,6 +170,7 @@ export function DraftResultsContent({
                 {rnd.picks.map((p) => {
                   const team = p.teamAb ? TEAM[p.teamAb] : null;
                   const mine = p.userId === currentUserId;
+                  const rec = p.teamAb ? standings[p.teamAb] : undefined;
                   return (
                     <div
                       key={p.pickNo}
@@ -196,6 +199,11 @@ export function DraftResultsContent({
                           {mine ? " (you)" : ""}
                         </div>
                       </div>
+                      {team && (
+                        <div style={{ flex: "none", fontFamily: "ui-monospace,monospace", fontSize: 14, color: "var(--color-neutral-400)" }}>
+                          {rec ? `${rec.wins}-${rec.losses}${rec.ties ? `-${rec.ties}` : ""}` : "–"}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
