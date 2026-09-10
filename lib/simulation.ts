@@ -27,7 +27,7 @@ import { getFpiRatings } from "./fpi";
 import { rostersFromPicks, type Pick } from "./draft";
 
 const TIE_PROBABILITY = 0.006; // ~1 in 165 games — roughly the modern-NFL tie rate
-const DEFAULT_TRIALS = 20000;
+const DEFAULT_TRIALS = 10000; // halved from 20k to keep re-simulating cheap while a game is live
 const REGULAR_SEASON_WEEKS = 18;
 const PREDICTOR_CONCURRENCY = 12; // courtesy cap -- don't fire ~270 requests at ESPN all at once
 
