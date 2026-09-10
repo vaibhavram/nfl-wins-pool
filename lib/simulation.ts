@@ -2,9 +2,18 @@
 // using per-game win probabilities, tallies each manager's combined wins in every simulated
 // season, and reports how often each manager ends up with the most.
 //
-// Two rating models are implemented side by side:
-//   - FPI (lib/fpi.ts)   — ESPN's Football Power Index. Currently ACTIVE: it's already reset
-//                           for the current season, so it needs no manual adjustment.
+// The active model (getFullSeasonGameData, below) is a hybrid, not a single rating system:
+//   - Completed games use their actual result, not a probability at all.
+//   - Live games use ESPN's own real-time win probability (already fetched for the Schedule
+//     tab's live scores -- lib/espn.ts#LiveGame.liveHomeWinProb).
+//   - Games that haven't started yet use ESPN's own pre-game "Matchup Predictor"
+//     (lib/espn.ts#getGamePredictor), falling back to the FPI model below only if that lookup
+//     fails for a given game.
+//
+// Two standalone rating models are also kept for that pre-game/fallback role and for
+// attachWinProbabilities (the Schedule tab's pre-game numbers, which this hybrid model doesn't
+// touch):
+//   - FPI (lib/fpi.ts)   — ESPN's Football Power Index. Currently ACTIVE for pre-game numbers.
 //   - Elo (lib/nfelo.ts) — nfeloapp's power ratings. Kept fully working but unused for now: as
 //                           of implementation, nfelo was still carrying raw end-of-last-season
 //                           Elo with no preseason regression, which produced an implausibly
@@ -12,7 +21,7 @@
 //                           nfelo updates for the new season, flip the aliases at the bottom of
 //                           this file back to the *Elo functions to switch back.
 import "server-only";
-import { getCurrentRegularSeasonWeek, getWeekScoreboard } from "./espn";
+import { getCurrentRegularSeasonWeek, getWeekScoreboard, getGamePredictor } from "./espn";
 import { getNfeloRatings, type NfeloRating } from "./nfelo";
 import { getFpiRatings } from "./fpi";
 import { rostersFromPicks, type Pick } from "./draft";
@@ -20,14 +29,63 @@ import { rostersFromPicks, type Pick } from "./draft";
 const TIE_PROBABILITY = 0.006; // ~1 in 165 games — roughly the modern-NFL tie rate
 const DEFAULT_TRIALS = 20000;
 const REGULAR_SEASON_WEEKS = 18;
+const PREDICTOR_CONCURRENCY = 12; // courtesy cap -- don't fire ~270 requests at ESPN all at once
 
-type ScheduledGame = { home: string; away: string };
+/** `fixedResult` set means "apply this every trial, don't sample" (a completed game); null means
+ * "sample from pHomeWin" (today's behavior) -- used for both pre-game and live games, just with
+ * different sources for pHomeWin. */
+type SimGame = { home: string; away: string; pHomeWin: number; fixedResult: "home" | "away" | "tie" | null };
 
-async function getFullSeasonSchedule(year: number): Promise<ScheduledGame[]> {
+async function mapWithConcurrency<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let next = 0;
+  async function worker() {
+    while (next < items.length) {
+      const i = next++;
+      results[i] = await fn(items[i]);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
+}
+
+/** Builds the full season's games with the hybrid model described above. `hasLiveGame` tells
+ * the caller (the API route) whether this result should be cached briefly (something's actively
+ * changing) or for the usual several hours (nothing is). */
+async function getFullSeasonGameData(year: number): Promise<{ games: SimGame[]; hasLiveGame: boolean }> {
   const weeks = await Promise.all(
     Array.from({ length: REGULAR_SEASON_WEEKS }, (_, i) => getWeekScoreboard(i + 1, year)),
   );
-  return weeks.flatMap((w) => w.games.map((g) => ({ home: g.home, away: g.away })));
+  const allGames = weeks.flatMap((w) => w.games);
+
+  let hasLiveGame = false;
+  const settled: SimGame[] = [];
+  const pending: (typeof allGames)[number][] = [];
+
+  for (const g of allGames) {
+    if (g.state === "post") {
+      const fixedResult: SimGame["fixedResult"] =
+        g.homeScore === g.awayScore ? "tie" : (g.homeScore ?? 0) > (g.awayScore ?? 0) ? "home" : "away";
+      settled.push({ home: g.home, away: g.away, pHomeWin: 0.5, fixedResult });
+    } else if (g.state === "in") {
+      hasLiveGame = true;
+      settled.push({ home: g.home, away: g.away, pHomeWin: g.liveHomeWinProb ?? 0.5, fixedResult: null });
+    } else {
+      pending.push(g);
+    }
+  }
+
+  if (pending.length > 0) {
+    const fpiRatings = await getFpiRatings();
+    const preGame = await mapWithConcurrency(pending, PREDICTOR_CONCURRENCY, async (g) => {
+      const predicted = await getGamePredictor(g.id);
+      const pHomeWin = predicted ?? fpiWinProbability(fpiRatings[g.home] ?? 0, fpiRatings[g.away] ?? 0);
+      return { home: g.home, away: g.away, pHomeWin, fixedResult: null } satisfies SimGame;
+    });
+    settled.push(...preGame);
+  }
+
+  return { games: settled, hasLiveGame };
 }
 
 function quantile(sorted: number[], q: number): number {
@@ -53,19 +111,24 @@ export type SimulationSummary = {
   year: number;
   generatedAt: string;
   model: string;
+  hasLiveGame: boolean;
   results: SimulationResult[];
 };
 
 /** Shared Monte Carlo engine — takes a precomputed home-win probability per game, independent
  * of which rating system produced it. `roster` is the pool's manager list (a userId in v2, a
- * name in the legacy single-tenant path) so everyone appears even before they've picked. */
+ * name in the legacy single-tenant path) so everyone appears even before they've picked.
+ * `fixedResult`, when set, means "apply this outcome every trial" (a completed game) instead of
+ * sampling from `pHomeWin` -- callers that never set it (the Elo path) get the original
+ * always-sample behavior unchanged. */
 async function simulateSeason(
   picks: Pick[],
   roster: string[],
-  games: { home: string; away: string; pHomeWin: number }[],
+  games: { home: string; away: string; pHomeWin: number; fixedResult?: "home" | "away" | "tie" | null }[],
   year: number,
   model: string,
   trials: number,
+  hasLiveGame = false,
 ): Promise<SimulationSummary> {
   const rosters = rostersFromPicks(picks, roster);
   const managerRoster = roster.map((m) => ({ manager: m, teams: rosters[m] ?? [] }));
@@ -86,6 +149,14 @@ async function simulateSeason(
   for (let t = 0; t < trials; t++) {
     for (const ab of teams) teamWins[ab] = 0;
     for (const g of games) {
+      if (g.fixedResult) {
+        if (g.fixedResult === "tie") {
+          teamWins[g.home] += 0.5;
+          teamWins[g.away] += 0.5;
+        } else if (g.fixedResult === "home") teamWins[g.home] += 1;
+        else teamWins[g.away] += 1;
+        continue;
+      }
       const r = Math.random();
       if (r < TIE_PROBABILITY) {
         teamWins[g.home] += 0.5;
@@ -124,7 +195,7 @@ async function simulateSeason(
   });
   results.sort((a, b) => b.winPct - a.winPct);
 
-  return { trials, year, generatedAt: new Date().toISOString(), model, results };
+  return { trials, year, generatedAt: new Date().toISOString(), model, hasLiveGame, results };
 }
 
 // ── Elo model (lib/nfelo.ts) — kept working, not currently used. See file header. ──────────
@@ -154,6 +225,15 @@ export async function attachWinProbabilitiesElo<T extends { home: string; away: 
     ...g,
     homeWinProb: eloWinProbability(ratedElo(g.home, ratings) + ELO_HOME_FIELD_ADVANTAGE, ratedElo(g.away, ratings)),
   }));
+}
+
+/** Bare home/away pairs for the whole season, no result/probability data attached -- only the
+ * unused Elo path needs this now; the active hybrid model uses getFullSeasonGameData instead. */
+async function getFullSeasonSchedule(year: number): Promise<{ home: string; away: string }[]> {
+  const weeks = await Promise.all(
+    Array.from({ length: REGULAR_SEASON_WEEKS }, (_, i) => getWeekScoreboard(i + 1, year)),
+  );
+  return weeks.flatMap((w) => w.games.map((g) => ({ home: g.home, away: g.away })));
 }
 
 export async function runSimulationElo(picks: Pick[], roster: string[], trials = DEFAULT_TRIALS): Promise<SimulationSummary> {
@@ -205,20 +285,19 @@ export async function attachWinProbabilitiesFpi<T extends { home: string; away: 
   }));
 }
 
-export async function runSimulationFpi(picks: Pick[], roster: string[], trials = DEFAULT_TRIALS): Promise<SimulationSummary> {
+// ── Hybrid model — ACTIVE for the leaderboard's Monte Carlo. See file header. ───────────────
+
+export async function runSimulationHybrid(picks: Pick[], roster: string[], trials = DEFAULT_TRIALS): Promise<SimulationSummary> {
   const { year } = await getCurrentRegularSeasonWeek();
-  const [schedule, ratings] = await Promise.all([getFullSeasonSchedule(year), getFpiRatings()]);
-  const games = schedule.map((g) => ({
-    home: g.home,
-    away: g.away,
-    pHomeWin: fpiWinProbability(ratings[g.home] ?? 0, ratings[g.away] ?? 0),
-  }));
-  return simulateSeason(picks, roster, games, year, "fpi", trials);
+  const { games, hasLiveGame } = await getFullSeasonGameData(year);
+  return simulateSeason(picks, roster, games, year, "espn-hybrid", trials, hasLiveGame);
 }
 
 // ── Active model — everything in app/api/* imports these three names. Flip to the *Elo
-// variants (or a blend) here, in one place, whenever we want to switch. ─────────────────────
+// variants (or a blend) here, in one place, whenever we want to switch. attachWinProbabilities
+// and getHomeWinProbability stay FPI-based -- they power the Schedule tab's pre-game numbers,
+// which the hybrid model above doesn't touch. ────────────────────────────────────────────────
 
 export const getHomeWinProbability = getHomeWinProbabilityFpi;
 export const attachWinProbabilities = attachWinProbabilitiesFpi;
-export const runSimulation = runSimulationFpi;
+export const runSimulation = runSimulationHybrid;

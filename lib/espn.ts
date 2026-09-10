@@ -46,6 +46,7 @@ export async function getCurrentRegularSeasonWeek(): Promise<{ week: number; yea
 // ── Week scoreboard ──────────────────────────────────────────────────────
 
 export type LiveGame = {
+  id: string; // ESPN's event id -- addresses the per-game summary endpoint (see getGamePredictor)
   away: string;
   home: string;
   awayScore: number | null;
@@ -64,6 +65,7 @@ export type LiveWeek = {
 };
 
 type ScoreboardEvent = {
+  id: string;
   date: string;
   status: { type: { completed: boolean; state: "pre" | "in" | "post"; shortDetail: string; description: string } };
   competitions: [
@@ -97,6 +99,7 @@ export async function getWeekScoreboard(week: number, year: number): Promise<Liv
     const state = ev.status.type.state;
     const scored = state !== "pre"; // score exists once a game has kicked off, not just once it's final
     return {
+      id: ev.id,
       away: away.team.abbreviation,
       home: home.team.abbreviation,
       awayScore: scored ? Number(away.score) : null,
@@ -113,6 +116,32 @@ export async function getWeekScoreboard(week: number, year: number): Promise<Liv
     games,
     byeTeams: (data.week.teamsOnBye ?? []).map((t) => t.abbreviation),
   };
+}
+
+// ── Pre-game win probability ("Matchup Predictor") ─────────────────────────
+
+const PREDICTOR_REVALIDATE_SECONDS = 86400; // 24h -- this is inherently a pull-once-a-day number
+
+type SummaryPredictorResponse = {
+  predictor?: { homeTeam?: { gameProjection?: string }; awayTeam?: { gameProjection?: string } };
+};
+
+/** ESPN's own pre-game "Matchup Predictor" for one game, as a 0-1 home-win probability. Only
+ * available on the per-game summary endpoint (not the scoreboard), one call per game -- callers
+ * fetching this for many games should cap concurrency rather than fire them all at once, as a
+ * courtesy to ESPN's free unauthenticated endpoint. Returns null (never throws) on any failure --
+ * missing field, malformed number, request error -- so one bad game doesn't take down a caller
+ * that's resolving many of these at once; callers should fall back to another model on null. */
+export async function getGamePredictor(eventId: string): Promise<number | null> {
+  try {
+    const data = await getJson<SummaryPredictorResponse>(`${SITE_BASE}/summary?event=${eventId}`, PREDICTOR_REVALIDATE_SECONDS);
+    const home = Number(data.predictor?.homeTeam?.gameProjection);
+    const away = Number(data.predictor?.awayTeam?.gameProjection);
+    if (!Number.isFinite(home) || !Number.isFinite(away) || home + away <= 0) return null;
+    return home / (home + away); // normalizes even if the two don't sum to exactly 100
+  } catch {
+    return null;
+  }
 }
 
 // ── Standings ─────────────────────────────────────────────────────────────
