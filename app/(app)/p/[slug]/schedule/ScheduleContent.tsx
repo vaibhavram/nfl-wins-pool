@@ -216,9 +216,16 @@ function TeamRow({
         </div>
       </div>
       {hasPossession && (
-        <span aria-label="Has possession" style={{ fontSize: 13, flex: "none" }}>
-          🏈
-        </span>
+        <span
+          aria-label="Has possession"
+          style={{
+            flex: "none",
+            width: 6,
+            height: 6,
+            borderRadius: "50%",
+            background: "var(--color-text)",
+          }}
+        />
       )}
       <div style={{ fontFamily: "ui-monospace,monospace", fontSize: 14, color: "var(--color-text)" }}>{score}</div>
     </div>
