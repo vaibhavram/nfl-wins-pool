@@ -66,6 +66,12 @@ export default function SignInPage() {
           {submitting ? "Sending…" : "Email me a link"}
         </button>
       </form>
+      <div style={{ textAlign: "center", fontSize: 12.5, color: "var(--color-neutral-600)" }}>
+        Already in a pool?{" "}
+        <Link href="/claim" style={{ color: "var(--color-accent-300)" }}>
+          Claim your account
+        </Link>
+      </div>
     </div>
   );
 }

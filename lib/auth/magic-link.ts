@@ -30,6 +30,14 @@ function emailContent(
       html: `<p>${intro}</p><p><a href="${link}">Accept the invite</a></p><p>This link remains active for 20 minutes.</p>`,
     };
   }
+  if (purpose === "claim") {
+    const intro = "You requested to link this email to your Wins Pool account. Click below to confirm.";
+    return {
+      subject: "Confirm your Wins Pool account",
+      text: `${intro}\n\n${link}\n\nThis link remains active for 20 minutes.`,
+      html: `<p>${intro}</p><p><a href="${link}">Confirm and sign in</a></p><p>This link remains active for 20 minutes.</p>`,
+    };
+  }
   const intro = "You requested a sign-in link from The Wins Pool. Please click the link below to verify your email.";
   return {
     subject: "Your sign-in link",
@@ -77,13 +85,53 @@ export type ConsumeResult =
   | { ok: true; userId: string; tokenVersion: number; redirectTo: string | null; needsOnboarding: boolean }
   | { ok: false; error: string };
 
+/** Same sanitization app/onboarding/page.tsx#suggestUsername applies to an email local-part,
+ * applied here to a legacy manager's display name instead (e.g. "Jong Ha" -> "jong_ha"). */
+function sanitizeUsername(raw: string): string {
+  return raw
+    .toLowerCase()
+    .replace(/[^a-z0-9_]/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_|_$/g, "")
+    .slice(0, 20);
+}
+
+/** Finishes a claim-purpose link: fills in the placeholder's email/username and marks it
+ * onboarded/claimed, in one step, skipping the normal onboarding form entirely -- we already
+ * know the person's name (from the legacy roster) and phone (they typed it into /claim just
+ * before this link was issued). Guarded by `onboarded_at IS NULL` so a stale second link from
+ * the same claim attempt is a harmless no-op rather than clobbering anything. */
+async function completeClaim(userId: string, email: string): Promise<void> {
+  const rows = await query<{ display_name: string }>("SELECT display_name FROM users WHERE id = $1 AND onboarded_at IS NULL", [
+    userId,
+  ]);
+  if (!rows[0]) return; // already completed (or was never a claim placeholder to begin with)
+
+  const base = sanitizeUsername(rows[0].display_name) || "manager";
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const suffix = attempt === 0 ? "" : String(attempt + 1);
+    const candidate = suffix ? `${base.slice(0, 20 - suffix.length)}${suffix}` : base;
+    try {
+      await query(
+        "UPDATE users SET email = $1, username = $2, onboarded_at = now(), claimed_at = now() WHERE id = $3 AND onboarded_at IS NULL",
+        [email, candidate, userId],
+      );
+      return;
+    } catch (err) {
+      if ((err as { code?: string }).code === "23505") continue;
+      throw err;
+    }
+  }
+  throw new Error("Could not generate a unique username for claimed account");
+}
+
 /** Atomically marks the link consumed (single UPDATE...RETURNING, no read-then-write race,
  * matching the concurrency pattern lib/draft-server.ts already uses for pick submission), then
  * resolves or creates the user. An email-invite link's purpose='join_pool' link also serves as
  * that person's identity verification -- clicking it (from their own inbox) is itself proof of
  * email ownership, so no separate sign-in round-trip is needed on top of it. Claim-purpose links
- * (Phase 4) pin a user_id up front; this function will need a small extension then to also fill
- * in that user's email. */
+ * pin a user_id up front (see app/api/claim/confirm/route.ts) -- consumeMagicLink then also
+ * finishes that placeholder's profile via completeClaim, skipping onboarding entirely. */
 export async function consumeMagicLink(rawToken: string): Promise<ConsumeResult> {
   const rows = await query<{
     id: string;
@@ -115,6 +163,10 @@ export async function consumeMagicLink(rawToken: string): Promise<ConsumeResult>
     }
   }
 
+  if (link.purpose === "claim") {
+    await completeClaim(userId, link.email);
+  }
+
   const userRow = await query<{ token_version: number; onboarded_at: string | null }>(
     "SELECT token_version, onboarded_at FROM users WHERE id = $1",
     [userId],
@@ -126,6 +178,6 @@ export async function consumeMagicLink(rawToken: string): Promise<ConsumeResult>
     userId,
     tokenVersion: userRow[0].token_version,
     redirectTo: link.redirect_to,
-    needsOnboarding: userRow[0].onboarded_at === null,
+    needsOnboarding: link.purpose === "claim" ? false : userRow[0].onboarded_at === null,
   };
 }
