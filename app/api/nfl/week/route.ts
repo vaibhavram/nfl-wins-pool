@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentRegularSeasonWeek, getWeekScoreboard } from "@/lib/espn";
-import { attachWinProbabilities } from "@/lib/simulation";
+import { getSeasonGameData } from "@/lib/simulation";
 
 const MIN_WEEK = 1;
 const MAX_WEEK = 18;
@@ -14,11 +14,16 @@ export async function GET(req: NextRequest) {
   week = Math.min(MAX_WEEK, Math.max(MIN_WEEK, week));
 
   const live = await getWeekScoreboard(week, year);
-  const preGame = await attachWinProbabilities(live.games);
-  // Once a game's actually underway, ESPN's own live win probability (from the same scoreboard
-  // fetch, updated play by play) replaces the static pre-game FPI estimate -- pre/post games
-  // keep the FPI number as before.
-  const games = preGame.map((g) => ({ ...g, homeWinProb: g.liveHomeWinProb ?? g.homeWinProb }));
+  // Cross-reference the shared hybrid resolution by game id instead of computing a separate
+  // (FPI-only, live-unaware) probability here -- null hides the win-prob line entirely once a
+  // game is final, matching every other win-probability display in the app.
+  const { games: resolved } = await getSeasonGameData(year);
+  const resolvedById = new Map(resolved.map((g) => [g.id, g]));
+  const games = live.games.map((g) => {
+    const match = resolvedById.get(g.id);
+    const homeWinProb = match && match.state !== "post" ? match.pHomeWin : null;
+    return { ...g, homeWinProb };
+  });
 
   return NextResponse.json({
     week: live.week,

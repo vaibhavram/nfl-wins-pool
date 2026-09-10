@@ -1,20 +1,24 @@
 import { NextResponse } from "next/server";
-import { getTeamSchedule } from "@/lib/espn";
-import { getHomeWinProbability } from "@/lib/simulation";
+import { getTeamSchedule, getCurrentRegularSeasonWeek } from "@/lib/espn";
+import { getSeasonGameData } from "@/lib/simulation";
 
 export async function GET(_req: Request, ctx: RouteContext<"/api/nfl/team/[abbr]/schedule">) {
   const { abbr } = await ctx.params;
   const ab = abbr.toUpperCase();
   const rows = await getTeamSchedule(ab);
 
-  const schedule = await Promise.all(
-    rows.map(async (row) => {
-      if (!row.opponentAb) return { ...row, winProb: null };
-      const winProb =
-        row.at === "vs" ? await getHomeWinProbability(ab, row.opponentAb) : 1 - (await getHomeWinProbability(row.opponentAb, ab));
-      return { ...row, winProb };
-    }),
-  );
+  const { year } = await getCurrentRegularSeasonWeek();
+  const { games: resolved } = await getSeasonGameData(year);
+  const resolvedById = new Map(resolved.map((g) => [g.id, g]));
+
+  const schedule = rows.map((row) => {
+    if (!row.opponentAb) return { ...row, winProb: null };
+    const match = resolvedById.get(row.id);
+    if (!match || match.state === "post") return { ...row, winProb: null };
+    // pHomeWin is always from the home team's perspective -- flip it for an away game.
+    const winProb = row.at === "vs" ? match.pHomeWin : 1 - match.pHomeWin;
+    return { ...row, winProb };
+  });
 
   return NextResponse.json({ schedule });
 }

@@ -6,7 +6,7 @@ import { SettingsGearLink } from "@/components/pool/SettingsGearLink";
 import { PoolSwitcher } from "@/components/pool/PoolSwitcher";
 import { TEAM } from "@/lib/teams";
 import { totalWins, TOTAL_PICKS } from "@/lib/draft";
-import { useStandings, useWeek } from "@/lib/live-data";
+import { useStandings, useWeek, useProjectedWins } from "@/lib/live-data";
 import { usePoolSimulation } from "@/lib/client/pool-live-data";
 import { formatWinPct, formatWins as fmtWins } from "@/lib/format";
 
@@ -34,6 +34,7 @@ export function ManagerRoster({
   const { standings, loading } = useStandings();
   const { results: simResults } = usePoolSimulation(slug);
   const { week } = useWeek(null);
+  const { projectedWins } = useProjectedWins();
 
   const wins = totalWins(teams, standings);
   const sim = simResults.find((r) => r.manager === userId);
@@ -94,7 +95,8 @@ export function ManagerRoster({
                   <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 3 }}>
                     <div style={{ fontSize: 15, color: "var(--color-text)" }}>{team.full}</div>
                     <div style={{ fontSize: 12.5, color: "var(--color-neutral-500)" }}>
-                      {team.div} · O/U {team.ou.toFixed(1)}
+                      {team.div}
+                      {projectedWins[ab] !== undefined && ` · Projected ${fmtWins(projectedWins[ab])} wins`}
                     </div>
                   </div>
                   <div style={{ fontFamily: "var(--font-heading)", fontSize: 20, color: "var(--color-text)" }}>

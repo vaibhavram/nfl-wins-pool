@@ -33,8 +33,17 @@ const PREDICTOR_CONCURRENCY = 12; // courtesy cap -- don't fire ~270 requests at
 
 /** `fixedResult` set means "apply this every trial, don't sample" (a completed game); null means
  * "sample from pHomeWin" (today's behavior) -- used for both pre-game and live games, just with
- * different sources for pHomeWin. */
-type SimGame = { home: string; away: string; pHomeWin: number; fixedResult: "home" | "away" | "tie" | null };
+ * different sources for pHomeWin. `id`/`state` let API routes cross-reference a specific game's
+ * resolved probability against this same hybrid data instead of recomputing it independently
+ * (see getSeasonGameData). */
+export type SimGame = {
+  id: string;
+  home: string;
+  away: string;
+  state: "pre" | "in" | "post";
+  pHomeWin: number;
+  fixedResult: "home" | "away" | "tie" | null;
+};
 
 async function mapWithConcurrency<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
   const results: R[] = new Array(items.length);
@@ -66,10 +75,10 @@ async function getFullSeasonGameData(year: number): Promise<{ games: SimGame[]; 
     if (g.state === "post") {
       const fixedResult: SimGame["fixedResult"] =
         g.homeScore === g.awayScore ? "tie" : (g.homeScore ?? 0) > (g.awayScore ?? 0) ? "home" : "away";
-      settled.push({ home: g.home, away: g.away, pHomeWin: 0.5, fixedResult });
+      settled.push({ id: g.id, home: g.home, away: g.away, state: g.state, pHomeWin: 0.5, fixedResult });
     } else if (g.state === "in") {
       hasLiveGame = true;
-      settled.push({ home: g.home, away: g.away, pHomeWin: g.liveHomeWinProb ?? 0.5, fixedResult: null });
+      settled.push({ id: g.id, home: g.home, away: g.away, state: g.state, pHomeWin: g.liveHomeWinProb ?? 0.5, fixedResult: null });
     } else {
       pending.push(g);
     }
@@ -80,7 +89,7 @@ async function getFullSeasonGameData(year: number): Promise<{ games: SimGame[]; 
     const preGame = await mapWithConcurrency(pending, PREDICTOR_CONCURRENCY, async (g) => {
       const predicted = await getGamePredictor(g.id);
       const pHomeWin = predicted ?? fpiWinProbability(fpiRatings[g.home] ?? 0, fpiRatings[g.away] ?? 0);
-      return { home: g.home, away: g.away, pHomeWin, fixedResult: null } satisfies SimGame;
+      return { id: g.id, home: g.home, away: g.away, state: g.state, pHomeWin, fixedResult: null } satisfies SimGame;
     });
     settled.push(...preGame);
   }
@@ -97,7 +106,10 @@ const SEASON_GAME_DATA_LIVE_TTL_MS = 300_000; // 5 minutes
 const SEASON_GAME_DATA_LONG_TTL_MS = 21_600_000; // 6 hours
 const seasonGameDataCache = new Map<string, { data: { games: SimGame[]; hasLiveGame: boolean }; expiresAt: number }>();
 
-async function getCachedSeasonGameData(year: number): Promise<{ games: SimGame[]; hasLiveGame: boolean }> {
+/** Public so API routes (the week scoreboard, a team's per-game schedule) can cross-reference a
+ * specific game's resolved hybrid probability by id, instead of each computing its own
+ * (divergent, FPI-only) pre-game number independently. */
+export async function getSeasonGameData(year: number): Promise<{ games: SimGame[]; hasLiveGame: boolean }> {
   const key = String(year);
   const cached = seasonGameDataCache.get(key);
   if (cached && cached.expiresAt > Date.now()) return cached.data;
@@ -114,7 +126,7 @@ async function getCachedSeasonGameData(year: number): Promise<{ games: SimGame[]
  * schedule, home and away. */
 export async function getProjectedWinsByTeam(): Promise<Record<string, number>> {
   const { year } = await getCurrentRegularSeasonWeek();
-  const { games } = await getCachedSeasonGameData(year);
+  const { games } = await getSeasonGameData(year);
   const projected: Record<string, number> = {};
   for (const g of games) {
     let homeShare: number;
@@ -333,7 +345,7 @@ export async function attachWinProbabilitiesFpi<T extends { home: string; away: 
 
 export async function runSimulationHybrid(picks: Pick[], roster: string[], trials = DEFAULT_TRIALS): Promise<SimulationSummary> {
   const { year } = await getCurrentRegularSeasonWeek();
-  const { games, hasLiveGame } = await getCachedSeasonGameData(year);
+  const { games, hasLiveGame } = await getSeasonGameData(year);
   return simulateSeason(picks, roster, games, year, "espn-hybrid", trials, hasLiveGame);
 }
 

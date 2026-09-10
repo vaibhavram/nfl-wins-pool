@@ -138,7 +138,7 @@ export function ScheduleContent({
                   name={away?.full ?? g.away}
                   record={standings[g.away]}
                   owner={owners[g.away]}
-                  winProb={1 - g.homeWinProb}
+                  winProb={g.homeWinProb === null ? null : 1 - g.homeWinProb}
                   score={scored ? String(g.awayScore) : ""}
                   hasPossession={g.possession === "away"}
                   onOwnerClick={() => router.push(`/p/${slug}/team/${g.away}`)}
@@ -204,7 +204,7 @@ function TeamRow({
   name: string;
   record: TeamRecord | undefined;
   owner: string | undefined;
-  winProb: number;
+  winProb: number | null; // null once the game is final -- no win probability to show anymore
   score: string;
   hasPossession: boolean;
   onOwnerClick: () => void;
@@ -220,8 +220,12 @@ function TeamRow({
         </div>
         <div style={{ fontSize: 11.5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
           <span style={{ color: owner ? "var(--color-neutral-500)" : "var(--color-neutral-700)" }}>{owner ?? "undrafted"}</span>
-          <span style={{ color: "var(--color-neutral-700)" }}> | </span>
-          <span style={{ color: winProb >= 0.5 ? "var(--color-accent-400)" : "var(--color-neutral-600)" }}>{formatWinPct(winProb * 100)}% to win</span>
+          {winProb !== null && (
+            <>
+              <span style={{ color: "var(--color-neutral-700)" }}> | </span>
+              <span style={{ color: winProb >= 0.5 ? "var(--color-accent-400)" : "var(--color-neutral-600)" }}>{formatWinPct(winProb * 100)}% to win</span>
+            </>
+          )}
         </div>
       </div>
       {hasPossession && (

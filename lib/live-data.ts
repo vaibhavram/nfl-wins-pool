@@ -48,7 +48,7 @@ export function useProjectedWins() {
   return { projectedWins: data?.projectedWins ?? {}, loading, error };
 }
 
-export type WeekGame = LiveGame & { homeWinProb: number };
+export type WeekGame = LiveGame & { homeWinProb: number | null }; // null once the game is final
 
 export type WeekResponse = {
   week: number;

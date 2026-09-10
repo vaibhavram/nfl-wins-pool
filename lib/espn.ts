@@ -181,21 +181,24 @@ export async function getStandings(): Promise<Record<string, TeamRecord>> {
 // ── Per-team full-season schedule ───────────────────────────────────────────
 
 export type TeamScheduleRow = {
+  id: string; // ESPN's event id -- "" for the synthetic bye-week row; addresses the same game in getSeasonGameData
   week: number;
   at: "@" | "vs" | "";
   opponent: string;
   opponentAb: string; // "" for a bye week
   result: "W" | "L" | "T" | "";
   detail: string; // final score, once completed
+  state: "pre" | "in" | "post"; // "pre" for the synthetic bye-week row
   date: string | null; // ISO kickoff timestamp for not-yet-played games; null for a bye week
 };
 
 type TeamScheduleEvent = {
+  id: string;
   date: string;
   week: { number: number };
   competitions: [
     {
-      status: { type: { completed: boolean; shortDetail: string } };
+      status: { type: { completed: boolean; state: "pre" | "in" | "post"; shortDetail: string } };
       competitors: [
         { homeAway: "home" | "away"; team: { abbreviation: string; displayName: string }; score?: string; winner?: boolean },
         { homeAway: "home" | "away"; team: { abbreviation: string; displayName: string }; score?: string; winner?: boolean },
@@ -224,12 +227,14 @@ export async function getTeamSchedule(abbr: string): Promise<TeamScheduleRow[]> 
       detail = `${myScore}–${oppScore}`;
     }
     return {
+      id: ev.id,
       week: ev.week.number,
       at: me.homeAway === "home" ? "vs" : "@",
       opponent: opp.team.displayName,
       opponentAb: opp.team.abbreviation,
       result,
       detail,
+      state: comp.status.type.state,
       date: ev.date,
     };
   });
@@ -238,7 +243,7 @@ export async function getTeamSchedule(abbr: string): Promise<TeamScheduleRow[]> 
   const scheduledWeeks = new Set(rows.map((r) => r.week));
   for (let week = 1; week <= 18; week++) {
     if (!scheduledWeeks.has(week)) {
-      rows.push({ week, at: "", opponent: "Bye week", opponentAb: "", result: "", detail: "", date: null });
+      rows.push({ id: "", week, at: "", opponent: "Bye week", opponentAb: "", result: "", detail: "", state: "pre", date: null });
       break;
     }
   }
