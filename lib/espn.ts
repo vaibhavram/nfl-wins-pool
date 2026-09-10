@@ -192,6 +192,14 @@ export type TeamScheduleRow = {
   date: string | null; // ISO kickoff timestamp for not-yet-played games; null for a bye week
 };
 
+// Right after a game ends, this endpoint briefly reports a completed game's score as an object
+// ({value, displayValue}) instead of the plain numeric string it settles into shortly after --
+// Number() on the object form silently produces NaN, so both shapes need handling explicitly.
+type TeamScheduleScore = string | { value: number };
+function scoreValue(score: TeamScheduleScore | undefined): number {
+  return typeof score === "object" && score !== null ? score.value : Number(score);
+}
+
 type TeamScheduleEvent = {
   id: string;
   date: string;
@@ -200,8 +208,8 @@ type TeamScheduleEvent = {
     {
       status: { type: { completed: boolean; state: "pre" | "in" | "post"; shortDetail: string } };
       competitors: [
-        { homeAway: "home" | "away"; team: { abbreviation: string; displayName: string }; score?: string; winner?: boolean },
-        { homeAway: "home" | "away"; team: { abbreviation: string; displayName: string }; score?: string; winner?: boolean },
+        { homeAway: "home" | "away"; team: { abbreviation: string; displayName: string }; score?: TeamScheduleScore; winner?: boolean },
+        { homeAway: "home" | "away"; team: { abbreviation: string; displayName: string }; score?: TeamScheduleScore; winner?: boolean },
       ];
     },
   ];
@@ -221,8 +229,8 @@ export async function getTeamSchedule(abbr: string): Promise<TeamScheduleRow[]> 
     let result: TeamScheduleRow["result"] = "";
     let detail = "";
     if (completed) {
-      const myScore = Number(me.score);
-      const oppScore = Number(opp.score);
+      const myScore = scoreValue(me.score);
+      const oppScore = scoreValue(opp.score);
       result = myScore === oppScore ? "T" : myScore > oppScore ? "W" : "L";
       detail = `${myScore}–${oppScore}`;
     }
