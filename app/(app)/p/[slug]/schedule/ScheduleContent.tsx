@@ -138,6 +138,7 @@ export function ScheduleContent({
                   owner={owners[g.away]}
                   winProb={1 - g.homeWinProb}
                   score={scored ? String(g.awayScore) : ""}
+                  hasPossession={g.possession === "away"}
                   onOwnerClick={() => router.push(`/p/${slug}/team/${g.away}`)}
                 />
                 <TeamRow
@@ -146,19 +147,34 @@ export function ScheduleContent({
                   owner={owners[g.home]}
                   winProb={g.homeWinProb}
                   score={scored ? String(g.homeScore) : ""}
+                  hasPossession={g.possession === "home"}
                   onOwnerClick={() => router.push(`/p/${slug}/team/${g.home}`)}
                 />
                 <div
                   style={{
-                    fontSize: 11,
-                    letterSpacing: ".06em",
-                    textTransform: "uppercase",
-                    color: g.state === "in" ? "var(--color-accent-300)" : "var(--color-neutral-600)",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 2,
                     borderTop: "1px solid var(--color-divider)",
                     paddingTop: 5,
                   }}
                 >
-                  {g.state === "in" ? `● Live · ${g.statusDetail}` : g.completed ? "Final" : formatKickoff(g.date)}
+                  <div
+                    style={{
+                      fontSize: 11,
+                      letterSpacing: ".06em",
+                      textTransform: "uppercase",
+                      color: g.state === "in" ? "var(--color-accent-300)" : "var(--color-neutral-600)",
+                    }}
+                  >
+                    {g.state === "in" ? `● Live · ${g.statusDetail}` : g.completed ? "Final" : formatKickoff(g.date)}
+                  </div>
+                  {g.state === "in" && g.downDistanceText && (
+                    <div style={{ fontSize: 11.5, color: g.isRedZone ? "#ef4444" : "var(--color-neutral-500)" }}>
+                      {g.isRedZone ? "🔴 " : ""}
+                      {g.downDistanceText}
+                    </div>
+                  )}
                 </div>
               </div>
             );
@@ -177,6 +193,7 @@ function TeamRow({
   owner,
   winProb,
   score,
+  hasPossession,
   onOwnerClick,
 }: {
   ab: string;
@@ -184,6 +201,7 @@ function TeamRow({
   owner: string | undefined;
   winProb: number;
   score: string;
+  hasPossession: boolean;
   onOwnerClick: () => void;
 }) {
   return (
@@ -197,6 +215,11 @@ function TeamRow({
           <span style={{ color: winProb >= 0.5 ? "var(--color-accent-400)" : "var(--color-neutral-600)" }}>{formatWinPct(winProb * 100)}% to win</span>
         </div>
       </div>
+      {hasPossession && (
+        <span aria-label="Has possession" style={{ fontSize: 13, flex: "none" }}>
+          🏈
+        </span>
+      )}
       <div style={{ fontFamily: "ui-monospace,monospace", fontSize: 14, color: "var(--color-text)" }}>{score}</div>
     </div>
   );

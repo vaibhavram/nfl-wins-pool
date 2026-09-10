@@ -55,6 +55,9 @@ export type LiveGame = {
   state: "pre" | "in" | "post"; // "in" is the live, in-progress state
   statusDetail: string; // e.g. "8:42 - 3rd", "Halftime", "Final" -- ESPN's own short status text
   liveHomeWinProb: number | null; // ESPN's own live, play-by-play win probability; null before kickoff
+  possession: "home" | "away" | null; // which side has the ball right now; null unless live
+  downDistanceText: string | null; // e.g. "1st & 10 at NE 47"; null unless live
+  isRedZone: boolean;
   date: string; // ISO kickoff timestamp — client formats it in the viewer's own timezone
 };
 
@@ -71,12 +74,19 @@ type ScoreboardEvent = {
   competitions: [
     {
       competitors: [
-        { homeAway: "home" | "away"; team: { abbreviation: string }; score?: string },
-        { homeAway: "home" | "away"; team: { abbreviation: string }; score?: string },
+        { homeAway: "home" | "away"; team: { id: string; abbreviation: string }; score?: string },
+        { homeAway: "home" | "away"; team: { id: string; abbreviation: string }; score?: string },
       ];
-      // Present only once a game has kicked off -- ESPN's own live win-probability model,
-      // updated play by play (the same number that drives its live win-probability graph).
-      situation?: { lastPlay?: { probability?: { homeWinPercentage: number } } };
+      // Present only once a game has kicked off. `possession` is the ESPN team id with the
+      // ball (cross-referenced against the competitors' own team ids, below); the rest is
+      // ESPN's own live win-probability model, updated play by play (the same number that
+      // drives its live win-probability graph and its downDistanceText).
+      situation?: {
+        possession?: string;
+        downDistanceText?: string;
+        isRedZone?: boolean;
+        lastPlay?: { probability?: { homeWinPercentage: number } };
+      };
     },
   ];
 };
@@ -98,6 +108,9 @@ export async function getWeekScoreboard(week: number, year: number): Promise<Liv
     const completed = ev.status.type.completed;
     const state = ev.status.type.state;
     const scored = state !== "pre"; // score exists once a game has kicked off, not just once it's final
+    const possessionTeamId = comp.situation?.possession;
+    const possession: "home" | "away" | null =
+      possessionTeamId === home.team.id ? "home" : possessionTeamId === away.team.id ? "away" : null;
     return {
       id: ev.id,
       away: away.team.abbreviation,
@@ -108,6 +121,9 @@ export async function getWeekScoreboard(week: number, year: number): Promise<Liv
       state,
       statusDetail: ev.status.type.shortDetail,
       liveHomeWinProb: comp.situation?.lastPlay?.probability?.homeWinPercentage ?? null,
+      possession,
+      downDistanceText: comp.situation?.downDistanceText ?? null,
+      isRedZone: comp.situation?.isRedZone ?? false,
       date: ev.date,
     };
   });
