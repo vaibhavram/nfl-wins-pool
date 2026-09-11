@@ -4,35 +4,7 @@
 // as-is; only the two that need a `slug` in their URL get new versions here, so live-data.ts
 // itself stays untouched.
 import { useEffect, useState } from "react";
-
-type Fetched<T> = { data: T | null; loading: boolean; error: string | null };
-
-function useJsonFetch<T>(url: string | null): Fetched<T> {
-  const [state, setState] = useState<Fetched<T>>({ data: null, loading: true, error: null });
-
-  useEffect(() => {
-    if (!url) return;
-    let cancelled = false;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setState((s) => ({ ...s, loading: true, error: null }));
-    fetch(url)
-      .then((res) => {
-        if (!res.ok) throw new Error(`Request failed (${res.status})`);
-        return res.json();
-      })
-      .then((data) => {
-        if (!cancelled) setState({ data, loading: false, error: null });
-      })
-      .catch((err) => {
-        if (!cancelled) setState({ data: null, loading: false, error: err instanceof Error ? err.message : "Failed to load" });
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [url]);
-
-  return state;
-}
+import { useLivePolledFetch } from "../live-data";
 
 export type PoolSimulationResult = {
   manager: string; // a user_id
@@ -44,8 +16,18 @@ export type PoolSimulationResult = {
   p90Wins: number;
 };
 
+// Slower than the 20s live-data.ts default: the server itself only re-runs the Monte Carlo every
+// 5 minutes while a game is live (a deliberate cost tradeoff -- it's a heavier, pool-wide
+// aggregate, not a single number worth hammering), so polling faster than that would mostly just
+// re-fetch the same cached result.
+const SIM_POLL_MS = 60000;
+
 export function usePoolSimulation(slug: string) {
-  const { data, loading, error } = useJsonFetch<{ results: PoolSimulationResult[] }>(`/api/p/${slug}/analytics/simulate`);
+  const { data, loading, error } = useLivePolledFetch<{ results: PoolSimulationResult[]; hasLiveGame: boolean }>(
+    `/api/p/${slug}/analytics/simulate`,
+    (d) => d.hasLiveGame,
+    SIM_POLL_MS,
+  );
   return { results: data?.results ?? [], loading, error };
 }
 

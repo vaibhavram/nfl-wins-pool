@@ -35,8 +35,49 @@ function useJsonFetch<T>(url: string | null): Fetched<T> {
   return state;
 }
 
+export const LIVE_POLL_MS = 20000;
+
+/** Quietly re-fetches every `pollMs` in the background while `isLive(data)` is true, deliberately
+ * bypassing useJsonFetch's `loading` flag (a poll shouldn't flash "Loading…" repeatedly) via a
+ * separate `liveData` override that wins once populated. Self-terminating: once a poll comes
+ * back with `isLive` false, the interval isn't renewed on the next render. Resets on url change
+ * so switching away from a live resource doesn't leave a stale background poll running against
+ * the old one. Shared by every hook below that has a live/settled distinction, plus
+ * lib/client/pool-live-data.ts's usePoolSimulation. */
+export function useLivePolledFetch<T>(url: string | null, isLive: (data: T) => boolean, pollMs: number): Fetched<T> {
+  const { data, loading, error } = useJsonFetch<T>(url);
+  const [liveData, setLiveData] = useState<T | null>(null);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setLiveData(null);
+  }, [url]);
+
+  const current = liveData ?? data;
+  const shouldPoll = Boolean(current && isLive(current));
+
+  useEffect(() => {
+    if (!shouldPoll || !url) return;
+    const id = setInterval(() => {
+      fetch(url)
+        .then((res) => (res.ok ? res.json() : null))
+        .then((fresh) => {
+          if (fresh) setLiveData(fresh);
+        })
+        .catch(() => {});
+    }, pollMs);
+    return () => clearInterval(id);
+  }, [shouldPoll, url, pollMs]);
+
+  return { data: current, loading, error };
+}
+
 export function useStandings() {
-  const { data, loading, error } = useJsonFetch<{ standings: Record<string, TeamRecord> }>("/api/nfl/standings");
+  const { data, loading, error } = useLivePolledFetch<{ standings: Record<string, TeamRecord>; hasLiveGame: boolean }>(
+    "/api/nfl/standings",
+    (d) => d.hasLiveGame,
+    LIVE_POLL_MS,
+  );
   return { standings: data?.standings ?? {}, loading, error };
 }
 
@@ -44,7 +85,11 @@ export function useStandings() {
  * live win probability, future games via the same hybrid pre-game model the leaderboard uses --
  * see lib/simulation.ts#getProjectedWinsByTeam). */
 export function useProjectedWins() {
-  const { data, loading, error } = useJsonFetch<{ projectedWins: Record<string, number> }>("/api/nfl/projected-wins");
+  const { data, loading, error } = useLivePolledFetch<{ projectedWins: Record<string, number>; hasLiveGame: boolean }>(
+    "/api/nfl/projected-wins",
+    (d) => d.hasLiveGame,
+    LIVE_POLL_MS,
+  );
   return { projectedWins: data?.projectedWins ?? {}, loading, error };
 }
 
@@ -60,43 +105,14 @@ export type WeekResponse = {
   byeTeams: string[];
 };
 
-const LIVE_POLL_MS = 20000;
-
-/** While any game in the loaded week is in progress, quietly re-fetches every 20s in the
- * background -- deliberately bypassing useJsonFetch's `loading` flag (a poll shouldn't flash
- * "Loading…" every 20 seconds) via a separate `liveData` override that wins once populated.
- * Self-terminating: once a poll comes back with no more "in" games, `hasLiveGame` goes false on
- * the next render and the interval isn't renewed. Resets on week change so switching away from
- * a live week doesn't leave a stale background poll running against the old url. */
 export function useWeek(week: number | null) {
   const url = week === null ? "/api/nfl/week" : `/api/nfl/week?week=${week}`;
-  const { data, loading, error } = useJsonFetch<WeekResponse>(url);
-  const [liveData, setLiveData] = useState<WeekResponse | null>(null);
-
-  useEffect(() => {
-    // A genuinely new load (different week, or the initial fetch) -- drop any override from
-    // the previous url's background polling.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setLiveData(null);
-  }, [url]);
-
-  const current = liveData ?? data;
-  const hasLiveGame = Boolean(current?.games.some((g) => g.state === "in"));
-
-  useEffect(() => {
-    if (!hasLiveGame) return;
-    const id = setInterval(() => {
-      fetch(url)
-        .then((res) => (res.ok ? res.json() : null))
-        .then((fresh) => {
-          if (fresh) setLiveData(fresh);
-        })
-        .catch(() => {});
-    }, LIVE_POLL_MS);
-    return () => clearInterval(id);
-  }, [hasLiveGame, url]);
-
-  return { week: current, loading, error };
+  const { data, loading, error } = useLivePolledFetch<WeekResponse>(
+    url,
+    (d) => d.games.some((g) => g.state === "in"),
+    LIVE_POLL_MS,
+  );
+  return { week: data, loading, error };
 }
 
 export type SimulationResult = {
@@ -119,7 +135,11 @@ export type TeamScheduleRowWithProb = TeamScheduleRow & { winProb: number | null
 
 export function useTeamSchedule(abbr: string | null) {
   const url = abbr ? `/api/nfl/team/${abbr}/schedule` : null;
-  const { data, loading, error } = useJsonFetch<{ schedule: TeamScheduleRowWithProb[] }>(url);
+  const { data, loading, error } = useLivePolledFetch<{ schedule: TeamScheduleRowWithProb[]; hasLiveGame: boolean }>(
+    url,
+    (d) => d.hasLiveGame,
+    LIVE_POLL_MS,
+  );
   return { schedule: data?.schedule ?? null, loading, error };
 }
 

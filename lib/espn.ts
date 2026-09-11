@@ -133,6 +133,16 @@ export async function getWeekScoreboard(week: number, year: number): Promise<Liv
   };
 }
 
+/** Cheap "is anything live right now" check (one 15s-cached scoreboard fetch for the current
+ * week) -- used by routes whose own data has no live/game-state concept of its own (standings,
+ * per-team schedule, projected wins) so their client hooks know whether it's worth polling for a
+ * fresher answer. */
+export async function hasLiveGameThisWeek(): Promise<boolean> {
+  const { week, year } = await getCurrentRegularSeasonWeek();
+  const board = await getWeekScoreboard(week, year);
+  return board.games.some((g) => g.state === "in");
+}
+
 // ── Pre-game win probability ("Matchup Predictor") ─────────────────────────
 
 const PREDICTOR_REVALIDATE_SECONDS = 86400; // 24h -- this is inherently a pull-once-a-day number

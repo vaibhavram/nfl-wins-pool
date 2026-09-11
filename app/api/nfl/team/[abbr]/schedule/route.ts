@@ -20,5 +20,6 @@ export async function GET(_req: Request, ctx: RouteContext<"/api/nfl/team/[abbr]
     return { ...row, winProb };
   });
 
-  return NextResponse.json({ schedule });
+  const hasLiveGame = resolved.some((g) => g.state === "in");
+  return NextResponse.json({ schedule, hasLiveGame });
 }

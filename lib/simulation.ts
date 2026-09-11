@@ -119,9 +119,9 @@ export async function getSeasonGameData(year: number): Promise<{ games: SimGame[
  * probability), live games use ESPN's live win probability, and games that haven't started yet
  * use the same hybrid pre-game model as the leaderboard -- summed per team across the whole
  * schedule, home and away. */
-export async function getProjectedWinsByTeam(): Promise<Record<string, number>> {
+export async function getProjectedWinsByTeam(): Promise<{ projectedWins: Record<string, number>; hasLiveGame: boolean }> {
   const { year } = await getCurrentRegularSeasonWeek();
-  const { games } = await getSeasonGameData(year);
+  const { games, hasLiveGame } = await getSeasonGameData(year);
   const projected: Record<string, number> = {};
   for (const g of games) {
     let homeShare: number;
@@ -136,7 +136,7 @@ export async function getProjectedWinsByTeam(): Promise<Record<string, number>> 
     projected[g.home] = (projected[g.home] ?? 0) + homeShare;
     projected[g.away] = (projected[g.away] ?? 0) + awayShare;
   }
-  return projected;
+  return { projectedWins: projected, hasLiveGame };
 }
 
 function quantile(sorted: number[], q: number): number {

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { getStandings } from "@/lib/espn";
+import { getStandings, hasLiveGameThisWeek } from "@/lib/espn";
 
 export async function GET() {
-  const standings = await getStandings();
-  return NextResponse.json({ standings });
+  const [standings, hasLiveGame] = await Promise.all([getStandings(), hasLiveGameThisWeek()]);
+  return NextResponse.json({ standings, hasLiveGame });
 }
