@@ -97,40 +97,22 @@ async function getFullSeasonGameData(year: number): Promise<{ games: SimGame[]; 
   return { games: settled, hasLiveGame };
 }
 
-// Resolving the full season (up to ~270 pre-game predictor calls) is shared across every pool
-// and every caller -- keyed only by year, not roster/pool, so runSimulationHybrid and
-// getProjectedWinsByTeam (a team detail page, potentially viewed far more often than the
-// leaderboard) don't each independently re-resolve the same games. Same dynamic TTL the
-// simulate route already uses: short while something's live, long otherwise.
-const SEASON_GAME_DATA_LIVE_TTL_MS = 300_000; // 5 minutes
-const SEASON_GAME_DATA_LONG_TTL_MS = 21_600_000; // 6 hours
-const seasonGameDataCache = new Map<string, { data: { games: SimGame[]; hasLiveGame: boolean }; expiresAt: number }>();
-
 /** Public so API routes (the week scoreboard, a team's per-game schedule) can cross-reference a
  * specific game's resolved hybrid probability by id, instead of each computing its own
- * (divergent, FPI-only) pre-game number independently. */
+ * (divergent, FPI-only) pre-game number independently.
+ *
+ * Deliberately uncached at this layer -- the Schedule tab's per-game win probability must stay
+ * "live API calls, not cached" (an earlier attempt to share a 5-minute cache here with the
+ * leaderboard's Monte Carlo made the Schedule tab inherit that same staleness, which is exactly
+ * the bug this replaced). Cost is still controlled: every game this resolves bottoms out in
+ * getWeekScoreboard (15s fetch cache) or getGamePredictor (24h fetch cache), both in lib/espn.ts,
+ * so a call here only does real network work when those are actually stale -- otherwise it's
+ * just re-running a cheap in-memory aggregation over already-cached results. The leaderboard's
+ * own 5-minute-while-live cache lives one level up, around the full Monte Carlo run, in
+ * app/api/p/[slug]/analytics/simulate/route.ts -- that's the right place for "decrease
+ * complexity" to apply, not here. */
 export async function getSeasonGameData(year: number): Promise<{ games: SimGame[]; hasLiveGame: boolean }> {
-  const key = String(year);
-  const cached = seasonGameDataCache.get(key);
-
-  // A cache entry written while nothing was live gets the long (6h) TTL -- but a game can go
-  // live at any moment after that, and the entry doesn't know to invalidate early just because
-  // something newly started. So always take one cheap, always-fresh peek (getWeekScoreboard's
-  // own 15s cache, already paid for elsewhere) at whether anything's live *right now*; if so and
-  // the cached entry doesn't already reflect a live game, treat it as stale regardless of its
-  // own expiry.
-  const { week: currentWeek } = await getCurrentRegularSeasonWeek();
-  const currentBoard = await getWeekScoreboard(currentWeek, year);
-  const liveRightNow = currentBoard.games.some((g) => g.state === "in");
-
-  if (cached && cached.expiresAt > Date.now() && (cached.data.hasLiveGame || !liveRightNow)) {
-    return cached.data;
-  }
-
-  const data = await getFullSeasonGameData(year);
-  const ttl = data.hasLiveGame ? SEASON_GAME_DATA_LIVE_TTL_MS : SEASON_GAME_DATA_LONG_TTL_MS;
-  seasonGameDataCache.set(key, { data, expiresAt: Date.now() + ttl });
-  return data;
+  return getFullSeasonGameData(year);
 }
 
 /** Each team's projected wins for the full season: completed games count as 1/0/0.5 (not a
