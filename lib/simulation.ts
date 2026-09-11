@@ -112,7 +112,20 @@ const seasonGameDataCache = new Map<string, { data: { games: SimGame[]; hasLiveG
 export async function getSeasonGameData(year: number): Promise<{ games: SimGame[]; hasLiveGame: boolean }> {
   const key = String(year);
   const cached = seasonGameDataCache.get(key);
-  if (cached && cached.expiresAt > Date.now()) return cached.data;
+
+  // A cache entry written while nothing was live gets the long (6h) TTL -- but a game can go
+  // live at any moment after that, and the entry doesn't know to invalidate early just because
+  // something newly started. So always take one cheap, always-fresh peek (getWeekScoreboard's
+  // own 15s cache, already paid for elsewhere) at whether anything's live *right now*; if so and
+  // the cached entry doesn't already reflect a live game, treat it as stale regardless of its
+  // own expiry.
+  const { week: currentWeek } = await getCurrentRegularSeasonWeek();
+  const currentBoard = await getWeekScoreboard(currentWeek, year);
+  const liveRightNow = currentBoard.games.some((g) => g.state === "in");
+
+  if (cached && cached.expiresAt > Date.now() && (cached.data.hasLiveGame || !liveRightNow)) {
+    return cached.data;
+  }
 
   const data = await getFullSeasonGameData(year);
   const ttl = data.hasLiveGame ? SEASON_GAME_DATA_LIVE_TTL_MS : SEASON_GAME_DATA_LONG_TTL_MS;
