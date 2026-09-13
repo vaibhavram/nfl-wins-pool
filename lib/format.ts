@@ -19,6 +19,14 @@ export function formatWins(w: number): string {
   return Number.isInteger(w) ? String(w) : w.toFixed(1);
 }
 
+const HTML_ESCAPES: Record<string, string> = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
+
+/** Escapes text for safe interpolation into an HTML string template (e.g. an email body) --
+ * needed anywhere untrusted or generated text, like an LLM recap, gets embedded directly. */
+export function escapeHtml(s: string): string {
+  return s.replace(/[&<>"']/g, (c) => HTML_ESCAPES[c]);
+}
+
 /** 1 -> "1st", 2 -> "2nd", 3 -> "3rd", 11-13 -> "th" (the standard English exceptions). */
 export function ordinal(n: number): string {
   const mod100 = n % 100;

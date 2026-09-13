@@ -1,0 +1,60 @@
+// Renders a static standings-style PNG for the weekly digest email via next/og's Satori-based
+// image generation -- no headless browser dependency, at the cost of being a recreation of the
+// Standings tab's layout rather than a literal screenshot of it.
+import "server-only";
+import { ImageResponse } from "next/og";
+import { TEAM } from "./teams";
+import type { StandingsRow } from "./weekly-digest";
+
+const WIDTH = 640;
+const ROW_HEIGHT = 56;
+const HEADER_HEIGHT = 72;
+const PADDING = 28;
+
+export async function renderLeaderboardImage(poolName: string, rows: StandingsRow[]): Promise<Buffer> {
+  const height = HEADER_HEIGHT + rows.length * ROW_HEIGHT + PADDING * 2;
+  const image = new ImageResponse(
+    (
+      <div
+        style={{
+          width: WIDTH,
+          height,
+          display: "flex",
+          flexDirection: "column",
+          background: "#0b0e13",
+          padding: PADDING,
+          fontFamily: "sans-serif",
+        }}
+      >
+        <div style={{ display: "flex", color: "#f5f5f5", fontSize: 24, marginBottom: 20 }}>{poolName}</div>
+        <div style={{ display: "flex", flexDirection: "column" }}>
+          {rows.map((r, i) => (
+            <div
+              key={r.name}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                height: ROW_HEIGHT,
+                borderTop: i === 0 ? "none" : "1px solid #23272e",
+              }}
+            >
+              <div style={{ display: "flex", width: 26, color: i === 0 ? "#7dd3a8" : "#6b7280", fontSize: 15 }}>{i + 1}</div>
+              <div style={{ display: "flex", flex: 1, color: "#f5f5f5", fontSize: 16 }}>{r.name}</div>
+              <div style={{ display: "flex", gap: 6 }}>
+                {r.teams.map((ab) => (
+                  // eslint-disable-next-line @next/next/no-img-element -- Satori image node, not a browser <img>
+                  <img key={ab} src={TEAM[ab]?.logo} width={26} height={26} alt={ab} />
+                ))}
+              </div>
+              <div style={{ display: "flex", width: 56, justifyContent: "flex-end", color: "#f5f5f5", fontSize: 20 }}>
+                {Number.isInteger(r.wins) ? r.wins : r.wins.toFixed(1)}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    ),
+    { width: WIDTH, height },
+  );
+  return Buffer.from(await image.arrayBuffer());
+}
