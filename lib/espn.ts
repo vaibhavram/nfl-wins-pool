@@ -8,10 +8,6 @@ const CORE_BASE = "https://site.api.espn.com/apis/v2/sports/football/nfl";
 
 const REGULAR_SEASON = 2;
 const CALENDAR_REVALIDATE_SECONDS = 3600;
-// A week that isn't the current one can't be live -- it's either already final or hasn't kicked
-// off, neither of which changes fast enough to need no-store. Exported so lib/simulation.ts's
-// 18-week bulk resolution can pass this for every week except whichever one is actually current.
-export const NON_CURRENT_WEEK_REVALIDATE_SECONDS = 3600;
 
 async function getJson<T>(url: string, revalidate: number | "no-store"): Promise<T> {
   const res = await fetch(url, revalidate === "no-store" ? { cache: "no-store" } : { next: { revalidate } });
@@ -97,14 +93,13 @@ type WeekScoreboardResponse = {
   events: ScoreboardEvent[];
 };
 
-/** `revalidate` defaults to "no-store" -- next.revalidate has now failed to reliably invalidate
- * in this environment three separate times (this exact endpoint included: live games sat stuck
- * as "pre" with null scores far longer than its old 15s window, confirmed by comparing our own
- * endpoint against a direct ESPN fetch of the identical URL at the same moment), so always-fresh
- * is the safe default for any single-week caller. The one place that overrides it is
- * getFullSeasonGameData's 18-week bulk resolution: a week that isn't the current one can't
- * possibly be live, so it passes a real cache window there instead of paying for 17 unnecessary
- * fresh fetches on every call. */
+/** Low-level fetch, explicit revalidate required. `revalidate` defaults to "no-store" --
+ * next.revalidate has now failed to reliably invalidate in this environment three separate times
+ * (this exact endpoint included: live games sat stuck as "pre" with null scores far longer than
+ * its old 15s window, confirmed by comparing our own endpoint against a direct ESPN fetch of the
+ * identical URL at the same moment), so always-fresh is the safe default. Most callers should
+ * reach for getSmartWeekScoreboard below instead, which only pays the no-store cost when a game
+ * is actually near or during its live window. */
 export async function getWeekScoreboard(week: number, year: number, revalidate: number | "no-store" = "no-store"): Promise<LiveWeek> {
   // `dates=<year>` is load-bearing here: `week`+`year` alone silently falls back to the most
   // recently completed season (e.g. still serves 2025 well into 2026) until ESPN "promotes"
@@ -144,13 +139,37 @@ export async function getWeekScoreboard(week: number, year: number, revalidate: 
   };
 }
 
-/** Cheap "is anything live right now" check (one 15s-cached scoreboard fetch for the current
- * week) -- used by routes whose own data has no live/game-state concept of its own (standings,
- * per-team schedule, projected wins) so their client hooks know whether it's worth polling for a
- * fresher answer. */
+const LIVE_WINDOW_BEFORE_MS = 5 * 60 * 1000; // start treating a game as worth checking freshly 5 min before kickoff
+const LIVE_WINDOW_AFTER_MS = 4.5 * 60 * 60 * 1000; // generous upper bound covering a long game + overtime
+const WEEK_PEEK_REVALIDATE_SECONDS = 3600; // cheap enough to reuse across almost every call; kickoff times are static so staleness here doesn't matter
+
+function isNearOrDuringGame(game: LiveGame, now: number): boolean {
+  if (game.state === "in") return true;
+  if (game.state === "post") return false;
+  const kickoff = new Date(game.date).getTime();
+  return now >= kickoff - LIVE_WINDOW_BEFORE_MS && now <= kickoff + LIVE_WINDOW_AFTER_MS;
+}
+
+/** Only pays for a no-store fetch when at least one game in this week is within 5 minutes of
+ * kickoff or already live; otherwise reuses a much cheaper 1h-cached copy. Kickoff times are
+ * static (they don't go stale even in an hour-old fetch), so that arithmetic stays reliable
+ * regardless of how stale the cheap copy's `state`/scores are -- the only thing a stale `state`
+ * can cost here is briefly still paying for a redundant no-store fetch right after a game ends,
+ * never the reverse (missing a game that's actually starting or live). This is the default most
+ * callers should use instead of getWeekScoreboard directly. */
+export async function getSmartWeekScoreboard(week: number, year: number): Promise<LiveWeek> {
+  const cheap = await getWeekScoreboard(week, year, WEEK_PEEK_REVALIDATE_SECONDS);
+  const now = Date.now();
+  if (!cheap.games.some((g) => isNearOrDuringGame(g, now))) return cheap;
+  return getWeekScoreboard(week, year, "no-store");
+}
+
+/** Is anything live right now, anywhere in the current week -- used by routes whose own data has
+ * no live/game-state concept of its own (standings, per-team schedule, projected wins) so their
+ * client hooks know whether it's worth polling for a fresher answer. */
 export async function hasLiveGameThisWeek(): Promise<boolean> {
   const { week, year } = await getCurrentRegularSeasonWeek();
-  const board = await getWeekScoreboard(week, year);
+  const board = await getSmartWeekScoreboard(week, year);
   return board.games.some((g) => g.state === "in");
 }
 

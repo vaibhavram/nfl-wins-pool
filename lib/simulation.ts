@@ -21,7 +21,7 @@
 //                           nfelo updates for the new season, flip the aliases at the bottom of
 //                           this file back to the *Elo functions to switch back.
 import "server-only";
-import { getCurrentRegularSeasonWeek, getWeekScoreboard, getGamePredictor, NON_CURRENT_WEEK_REVALIDATE_SECONDS } from "./espn";
+import { getCurrentRegularSeasonWeek, getWeekScoreboard, getSmartWeekScoreboard, getGamePredictor } from "./espn";
 import { getNfeloRatings, type NfeloRating } from "./nfelo";
 import { getFpiRatings } from "./fpi";
 import { rostersFromPicks, type Pick } from "./draft";
@@ -62,17 +62,12 @@ async function mapWithConcurrency<T, R>(items: T[], limit: number, fn: (item: T)
  * the caller (the API route) whether this result should be cached briefly (something's actively
  * changing) or for the usual several hours (nothing is).
  *
- * Only the current week can possibly have a live game, so only its scoreboard fetch goes
- * no-store (getWeekScoreboard's default) -- the other 17 get a real cache window instead of 18
- * fresh ESPN requests on every call, since a week that's already final or hasn't started yet
- * doesn't change fast enough to need always-fresh. */
+ * Uses getSmartWeekScoreboard for all 18 weeks uniformly: it only pays for a no-store fetch on
+ * whichever week(s) actually have a game near or during its live window, so this doesn't cost 18
+ * fresh ESPN requests on every call the way always-no-store did. */
 async function getFullSeasonGameData(year: number): Promise<{ games: SimGame[]; hasLiveGame: boolean }> {
-  const { week: currentWeek } = await getCurrentRegularSeasonWeek();
   const weeks = await Promise.all(
-    Array.from({ length: REGULAR_SEASON_WEEKS }, (_, i) => {
-      const week = i + 1;
-      return week === currentWeek ? getWeekScoreboard(week, year) : getWeekScoreboard(week, year, NON_CURRENT_WEEK_REVALIDATE_SECONDS);
-    }),
+    Array.from({ length: REGULAR_SEASON_WEEKS }, (_, i) => getSmartWeekScoreboard(i + 1, year)),
   );
   const allGames = weeks.flatMap((w) => w.games);
 

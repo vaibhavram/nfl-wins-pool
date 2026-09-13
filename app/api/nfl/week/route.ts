@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentRegularSeasonWeek, getWeekScoreboard } from "@/lib/espn";
+import { getCurrentRegularSeasonWeek, getSmartWeekScoreboard } from "@/lib/espn";
 import { getSeasonGameData } from "@/lib/simulation";
 
 const MIN_WEEK = 1;
@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
   if (!Number.isFinite(week)) week = currentWeek;
   week = Math.min(MAX_WEEK, Math.max(MIN_WEEK, week));
 
-  const live = await getWeekScoreboard(week, year);
+  const live = await getSmartWeekScoreboard(week, year);
   // Cross-reference the shared hybrid resolution by game id instead of computing a separate
   // (FPI-only, live-unaware) probability here -- null hides the win-prob line entirely once a
   // game is final, matching every other win-probability display in the app.
