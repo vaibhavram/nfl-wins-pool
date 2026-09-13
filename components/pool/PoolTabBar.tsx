@@ -8,7 +8,7 @@ export function PoolTabBar({ slug }: { slug: string }) {
   const pathname = usePathname();
   const TABS = [
     { href: `/p/${slug}/standings`, label: "Standings", Icon: PodiumIcon },
-    { href: `/p/${slug}/schedule`, label: "Schedule", Icon: CalendarIcon },
+    { href: `/p/${slug}/schedule`, label: "Scores", Icon: CalendarIcon },
     { href: `/p/${slug}/my-teams`, label: "My teams", Icon: FootballIcon },
     { href: `/p/${slug}/draft-results`, label: "Draft", Icon: DraftResultsIcon },
   ];

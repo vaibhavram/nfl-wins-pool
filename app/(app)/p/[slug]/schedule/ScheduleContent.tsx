@@ -119,6 +119,8 @@ export function ScheduleContent({
             const home = TEAM[g.home];
             const scored = g.state !== "pre";
             const mine = myTeams.has(g.away) || myTeams.has(g.home);
+            const awayWon = g.completed && g.awayScore !== null && g.homeScore !== null && g.awayScore > g.homeScore;
+            const homeWon = g.completed && g.awayScore !== null && g.homeScore !== null && g.homeScore > g.awayScore;
             return (
               <div
                 key={i}
@@ -140,6 +142,7 @@ export function ScheduleContent({
                   owner={owners[g.away]}
                   winProb={g.homeWinProb === null ? null : 1 - g.homeWinProb}
                   score={scored ? String(g.awayScore) : ""}
+                  scoreWon={awayWon}
                   hasPossession={g.possession === "away"}
                   onOwnerClick={() => router.push(`/p/${slug}/team/${g.away}`)}
                 />
@@ -150,6 +153,7 @@ export function ScheduleContent({
                   owner={owners[g.home]}
                   winProb={g.homeWinProb}
                   score={scored ? String(g.homeScore) : ""}
+                  scoreWon={homeWon}
                   hasPossession={g.possession === "home"}
                   onOwnerClick={() => router.push(`/p/${slug}/team/${g.home}`)}
                 />
@@ -197,6 +201,7 @@ function TeamRow({
   owner,
   winProb,
   score,
+  scoreWon,
   hasPossession,
   onOwnerClick,
 }: {
@@ -206,6 +211,7 @@ function TeamRow({
   owner: string | undefined;
   winProb: number | null; // null once the game is final -- no win probability to show anymore
   score: string;
+  scoreWon: boolean; // bolds the score -- the only visual distinction between a final game's winner and loser, deliberately no shading/color per an earlier explicit ask
   hasPossession: boolean;
   onOwnerClick: () => void;
 }) {
@@ -240,7 +246,7 @@ function TeamRow({
           }}
         />
       )}
-      <div style={{ fontFamily: "ui-monospace,monospace", fontSize: 14, color: "var(--color-text)" }}>{score}</div>
+      <div style={{ fontFamily: "ui-monospace,monospace", fontSize: 14, fontWeight: scoreWon ? 700 : 400, color: "var(--color-text)" }}>{score}</div>
     </div>
   );
 }
