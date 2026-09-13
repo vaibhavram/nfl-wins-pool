@@ -211,7 +211,7 @@ function TeamRow({
   owner: string | undefined;
   winProb: number | null; // null once the game is final -- no win probability to show anymore
   score: string;
-  scoreWon: boolean; // bolds the score -- the only visual distinction between a final game's winner and loser, deliberately no shading/color per an earlier explicit ask
+  scoreWon: boolean; // bolds the name and score -- the only visual distinction between a final game's winner and loser, deliberately no shading/color per an earlier explicit ask
   hasPossession: boolean;
   onOwnerClick: () => void;
 }) {
@@ -220,7 +220,7 @@ function TeamRow({
     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
       <TeamLogo ab={ab} size={26} />
       <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", cursor: "pointer" }} onClick={onOwnerClick}>
-        <div style={{ fontSize: 13, color: "var(--color-text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+        <div style={{ fontSize: 13, fontWeight: scoreWon ? 700 : 400, color: "var(--color-text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
           {name}
           {recordText && <span style={{ color: "var(--color-neutral-500)" }}> {recordText}</span>}
         </div>
