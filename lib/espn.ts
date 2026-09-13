@@ -7,7 +7,6 @@ const SITE_BASE = "https://site.api.espn.com/apis/site/v2/sports/football/nfl";
 const CORE_BASE = "https://site.api.espn.com/apis/v2/sports/football/nfl";
 
 const REGULAR_SEASON = 2;
-const SCOREBOARD_REVALIDATE_SECONDS = 15; // short -- this is the one feed that needs to look "live"
 const CALENDAR_REVALIDATE_SECONDS = 3600;
 
 async function getJson<T>(url: string, revalidate: number | "no-store"): Promise<T> {
@@ -98,8 +97,14 @@ export async function getWeekScoreboard(week: number, year: number): Promise<Liv
   // `dates=<year>` is load-bearing here: `week`+`year` alone silently falls back to the most
   // recently completed season (e.g. still serves 2025 well into 2026) until ESPN "promotes"
   // the requested season's data for that week. Confirmed by direct comparison against the API.
+  // no-store, not a revalidate window: this was the one feed still on next.revalidate (15s), and
+  // it got caught the same way getStandings()/getTeamSchedule() did -- live games sitting stuck
+  // as "pre" with null scores for far longer than 15s, confirmed by comparing our own endpoint
+  // against a direct ESPN fetch of the identical URL at the same moment. next.revalidate has now
+  // failed to reliably invalidate in this environment three times; no-store is the only mechanism
+  // actually verified to work here, and this is exactly the feed that most needs it.
   const url = `${SITE_BASE}/scoreboard?week=${week}&seasontype=${REGULAR_SEASON}&year=${year}&dates=${year}`;
-  const data = await getJson<WeekScoreboardResponse>(url, SCOREBOARD_REVALIDATE_SECONDS);
+  const data = await getJson<WeekScoreboardResponse>(url, "no-store");
   const games: LiveGame[] = data.events.map((ev) => {
     const comp = ev.competitions[0];
     const away = comp.competitors.find((c) => c.homeAway === "away")!;
