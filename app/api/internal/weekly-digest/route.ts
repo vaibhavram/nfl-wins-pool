@@ -9,6 +9,9 @@ import { escapeHtml } from "@/lib/format";
 // week (Tuesday morning) by an external scheduler -- see the Railway cron service pointed at this
 // endpoint. `dryRun: true` returns each pool's generated recap and recipient list without
 // rendering an image or sending anything, so a bad recap can be caught before it goes out.
+// `previewTo: "you@example.com"` renders the real image and sends the real content for every
+// in-season pool, but to that one address instead of each pool's actual roster -- for checking
+// how the finished email actually looks in an inbox without emailing anyone else.
 export async function POST(req: Request) {
   const secret = process.env.MIGRATE_SECRET;
   if (!secret) return NextResponse.json({ error: "MIGRATE_SECRET not configured" }, { status: 500 });
@@ -22,6 +25,7 @@ export async function POST(req: Request) {
 
   const body = await req.json().catch(() => ({}));
   const dryRun = body?.dryRun === true;
+  const previewTo: string | null = typeof body?.previewTo === "string" ? body.previewTo : null;
 
   try {
     const digests = await getWeeklyDigests();
@@ -44,20 +48,22 @@ export async function POST(req: Request) {
     let sent = 0;
 
     for (const d of digests) {
-      if (d.recipients.length === 0) continue;
+      const recipients = previewTo ? [{ email: previewTo, name: previewTo }] : d.recipients;
+      if (recipients.length === 0) continue;
       const imageBuffer = await renderLeaderboardImage(d.name, d.standingsRows);
       const imageDataUri = `data:image/png;base64,${imageBuffer.toString("base64")}`;
       const link = `${appUrl}/p/${d.slug}/standings`;
+      const subject = `${previewTo ? "[PREVIEW] " : ""}${d.name}: Week ${d.week} recap`;
       const html = `<p>${escapeHtml(d.recap)}</p><p><img src="${imageDataUri}" alt="${escapeHtml(d.name)} standings" width="640" /></p><p><a href="${link}">View your pool</a></p>`;
       const text = `${d.recap}\n\n${link}`;
 
-      for (const r of d.recipients) {
-        await sendEmail({ to: r.email, subject: `${d.name}: Week ${d.week} recap`, html, text });
+      for (const r of recipients) {
+        await sendEmail({ to: r.email, subject, html, text });
         sent++;
       }
     }
 
-    return NextResponse.json({ ok: true, pools: digests.length, sent });
+    return NextResponse.json({ ok: true, pools: digests.length, sent, preview: Boolean(previewTo) });
   } catch (err) {
     return NextResponse.json({ ok: false, error: (err as Error).message }, { status: 500 });
   }
