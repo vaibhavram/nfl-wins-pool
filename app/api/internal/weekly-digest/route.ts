@@ -23,38 +23,42 @@ export async function POST(req: Request) {
   const body = await req.json().catch(() => ({}));
   const dryRun = body?.dryRun === true;
 
-  const digests = await getWeeklyDigests();
+  try {
+    const digests = await getWeeklyDigests();
 
-  if (dryRun) {
-    return NextResponse.json({
-      ok: true,
-      dryRun: true,
-      pools: digests.map((d) => ({
-        slug: d.slug,
-        name: d.name,
-        week: d.week,
-        recap: d.recap,
-        recipients: d.recipients.map((r) => r.email),
-      })),
-    });
-  }
-
-  const appUrl = process.env.APP_URL ?? new URL(req.url).origin;
-  let sent = 0;
-
-  for (const d of digests) {
-    if (d.recipients.length === 0) continue;
-    const imageBuffer = await renderLeaderboardImage(d.name, d.standingsRows);
-    const imageDataUri = `data:image/png;base64,${imageBuffer.toString("base64")}`;
-    const link = `${appUrl}/p/${d.slug}/standings`;
-    const html = `<p>${escapeHtml(d.recap)}</p><p><img src="${imageDataUri}" alt="${escapeHtml(d.name)} standings" width="640" /></p><p><a href="${link}">View your pool</a></p>`;
-    const text = `${d.recap}\n\n${link}`;
-
-    for (const r of d.recipients) {
-      await sendEmail({ to: r.email, subject: `${d.name}: Week ${d.week} recap`, html, text });
-      sent++;
+    if (dryRun) {
+      return NextResponse.json({
+        ok: true,
+        dryRun: true,
+        pools: digests.map((d) => ({
+          slug: d.slug,
+          name: d.name,
+          week: d.week,
+          recap: d.recap,
+          recipients: d.recipients.map((r) => r.email),
+        })),
+      });
     }
-  }
 
-  return NextResponse.json({ ok: true, pools: digests.length, sent });
+    const appUrl = process.env.APP_URL ?? new URL(req.url).origin;
+    let sent = 0;
+
+    for (const d of digests) {
+      if (d.recipients.length === 0) continue;
+      const imageBuffer = await renderLeaderboardImage(d.name, d.standingsRows);
+      const imageDataUri = `data:image/png;base64,${imageBuffer.toString("base64")}`;
+      const link = `${appUrl}/p/${d.slug}/standings`;
+      const html = `<p>${escapeHtml(d.recap)}</p><p><img src="${imageDataUri}" alt="${escapeHtml(d.name)} standings" width="640" /></p><p><a href="${link}">View your pool</a></p>`;
+      const text = `${d.recap}\n\n${link}`;
+
+      for (const r of d.recipients) {
+        await sendEmail({ to: r.email, subject: `${d.name}: Week ${d.week} recap`, html, text });
+        sent++;
+      }
+    }
+
+    return NextResponse.json({ ok: true, pools: digests.length, sent });
+  } catch (err) {
+    return NextResponse.json({ ok: false, error: (err as Error).message }, { status: 500 });
+  }
 }
