@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import type { LiveGame, TeamScheduleRow } from "./espn";
 import type { TeamRecord } from "./teams";
+import { GAME_STATE_POLL_MS, IDLE_POLL_MS, isGameActive } from "./game-window";
 
 type Fetched<T> = { data: T | null; loading: boolean; error: string | null };
 
@@ -35,16 +36,21 @@ function useJsonFetch<T>(url: string | null): Fetched<T> {
   return state;
 }
 
-export const LIVE_POLL_MS = 20000;
-
-/** Quietly re-fetches every `pollMs` in the background while `isLive(data)` is true, deliberately
- * bypassing useJsonFetch's `loading` flag (a poll shouldn't flash "Loading…" repeatedly) via a
- * separate `liveData` override that wins once populated. Self-terminating: once a poll comes
- * back with `isLive` false, the interval isn't renewed on the next render. Resets on url change
- * so switching away from a live resource doesn't leave a stale background poll running against
- * the old one. Shared by every hook below that has a live/settled distinction, plus
- * lib/client/pool-live-data.ts's usePoolSimulation. */
-export function useLivePolledFetch<T>(url: string | null, isLive: (data: T) => boolean, pollMs: number): Fetched<T> {
+/** Quietly re-fetches in the background: every `activeMs` while `isActive(data)` is true, every
+ * `idleMs` otherwise -- it never stops polling entirely while mounted, just slows down. That's
+ * the fix for the previous design's core bug: polling used to only continue once a fetch had
+ * already come back "live", so a page left open from before kickoff never noticed the game start
+ * on its own (nothing was ticking to re-check). Now there's always a timer running; `isActive`
+ * only controls its speed. Deliberately bypasses useJsonFetch's `loading` flag (a poll shouldn't
+ * flash "Loading…" repeatedly) via a separate `liveData` override that wins once populated.
+ * Resets on url change so switching resources doesn't leave a stale poll running against the old
+ * one. Shared by every hook below, plus lib/client/pool-live-data.ts's usePoolSimulation. */
+export function useLivePolledFetch<T>(
+  url: string | null,
+  isActive: (data: T) => boolean,
+  activeMs: number = GAME_STATE_POLL_MS,
+  idleMs: number = IDLE_POLL_MS,
+): Fetched<T> {
   const { data, loading, error } = useJsonFetch<T>(url);
   const [liveData, setLiveData] = useState<T | null>(null);
 
@@ -54,10 +60,10 @@ export function useLivePolledFetch<T>(url: string | null, isLive: (data: T) => b
   }, [url]);
 
   const current = liveData ?? data;
-  const shouldPoll = Boolean(current && isLive(current));
+  const active = Boolean(current && isActive(current));
 
   useEffect(() => {
-    if (!shouldPoll || !url) return;
+    if (!url) return;
     const id = setInterval(() => {
       fetch(url)
         .then((res) => (res.ok ? res.json() : null))
@@ -65,9 +71,9 @@ export function useLivePolledFetch<T>(url: string | null, isLive: (data: T) => b
           if (fresh) setLiveData(fresh);
         })
         .catch(() => {});
-    }, pollMs);
+    }, active ? activeMs : idleMs);
     return () => clearInterval(id);
-  }, [shouldPoll, url, pollMs]);
+  }, [url, active, activeMs, idleMs]);
 
   return { data: current, loading, error };
 }
@@ -76,7 +82,6 @@ export function useStandings() {
   const { data, loading, error } = useLivePolledFetch<{ standings: Record<string, TeamRecord>; hasLiveGame: boolean }>(
     "/api/nfl/standings",
     (d) => d.hasLiveGame,
-    LIVE_POLL_MS,
   );
   return { standings: data?.standings ?? {}, loading, error };
 }
@@ -88,7 +93,6 @@ export function useProjectedWins() {
   const { data, loading, error } = useLivePolledFetch<{ projectedWins: Record<string, number>; hasLiveGame: boolean }>(
     "/api/nfl/projected-wins",
     (d) => d.hasLiveGame,
-    LIVE_POLL_MS,
   );
   return { projectedWins: data?.projectedWins ?? {}, loading, error };
 }
@@ -107,10 +111,8 @@ export type WeekResponse = {
 
 export function useWeek(week: number | null) {
   const url = week === null ? "/api/nfl/week" : `/api/nfl/week?week=${week}`;
-  const { data, loading, error } = useLivePolledFetch<WeekResponse>(
-    url,
-    (d) => d.games.some((g) => g.state === "in"),
-    LIVE_POLL_MS,
+  const { data, loading, error } = useLivePolledFetch<WeekResponse>(url, (d) =>
+    d.games.some((g) => isGameActive(g.state, g.date)),
   );
   return { week: data, loading, error };
 }
@@ -135,10 +137,8 @@ export type TeamScheduleRowWithProb = TeamScheduleRow & { winProb: number | null
 
 export function useTeamSchedule(abbr: string | null) {
   const url = abbr ? `/api/nfl/team/${abbr}/schedule` : null;
-  const { data, loading, error } = useLivePolledFetch<{ schedule: TeamScheduleRowWithProb[]; hasLiveGame: boolean }>(
-    url,
-    (d) => d.hasLiveGame,
-    LIVE_POLL_MS,
+  const { data, loading, error } = useLivePolledFetch<{ schedule: TeamScheduleRowWithProb[]; hasLiveGame: boolean }>(url, (d) =>
+    d.schedule.some((g) => g.date && isGameActive(g.state, g.date)),
   );
   return { schedule: data?.schedule ?? null, loading, error };
 }

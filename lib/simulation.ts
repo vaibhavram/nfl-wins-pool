@@ -21,10 +21,11 @@
 //                           nfelo updates for the new season, flip the aliases at the bottom of
 //                           this file back to the *Elo functions to switch back.
 import "server-only";
-import { getCurrentRegularSeasonWeek, getWeekScoreboard, getSmartWeekScoreboard, getGamePredictor } from "./espn";
+import { getCurrentRegularSeasonWeek, getWeekScoreboard, getGamePredictor } from "./espn";
 import { getNfeloRatings, type NfeloRating } from "./nfelo";
 import { getFpiRatings } from "./fpi";
 import { rostersFromPicks, type Pick } from "./draft";
+import { LEADERBOARD_RECOMPUTE_MS } from "./game-window";
 
 const TIE_PROBABILITY = 0.006; // ~1 in 165 games — roughly the modern-NFL tie rate
 const DEFAULT_TRIALS = 10000; // halved from 20k to keep re-simulating cheap while a game is live
@@ -59,15 +60,12 @@ async function mapWithConcurrency<T, R>(items: T[], limit: number, fn: (item: T)
 }
 
 /** Builds the full season's games with the hybrid model described above. `hasLiveGame` tells
- * the caller (the API route) whether this result should be cached briefly (something's actively
- * changing) or for the usual several hours (nothing is).
- *
- * Uses getSmartWeekScoreboard for all 18 weeks uniformly: it only pays for a no-store fetch on
- * whichever week(s) actually have a game near or during its live window, so this doesn't cost 18
- * fresh ESPN requests on every call the way always-no-store did. */
+ * the caller (getSeasonGameData's cache wrapper) whether anything in this result is still
+ * changing. This always fetches all 18 weeks fresh (no-store) -- getSeasonGameData below is what
+ * bounds the cost of that, by only calling this once per LEADERBOARD_RECOMPUTE_MS window. */
 async function getFullSeasonGameData(year: number): Promise<{ games: SimGame[]; hasLiveGame: boolean }> {
   const weeks = await Promise.all(
-    Array.from({ length: REGULAR_SEASON_WEEKS }, (_, i) => getSmartWeekScoreboard(i + 1, year)),
+    Array.from({ length: REGULAR_SEASON_WEEKS }, (_, i) => getWeekScoreboard(i + 1, year)),
   );
   const allGames = weeks.flatMap((w) => w.games);
 
@@ -101,22 +99,26 @@ async function getFullSeasonGameData(year: number): Promise<{ games: SimGame[]; 
   return { games: settled, hasLiveGame };
 }
 
-/** Public so API routes (the week scoreboard, a team's per-game schedule) can cross-reference a
- * specific game's resolved hybrid probability by id, instead of each computing its own
- * (divergent, FPI-only) pre-game number independently.
- *
- * Deliberately uncached at this layer -- the Schedule tab's per-game win probability must stay
- * "live API calls, not cached" (an earlier attempt to share a 5-minute cache here with the
- * leaderboard's Monte Carlo made the Schedule tab inherit that same staleness, which is exactly
- * the bug this replaced). Cost is still controlled: every game this resolves bottoms out in
- * getWeekScoreboard (15s fetch cache) or getGamePredictor (24h fetch cache), both in lib/espn.ts,
- * so a call here only does real network work when those are actually stale -- otherwise it's
- * just re-running a cheap in-memory aggregation over already-cached results. The leaderboard's
- * own 5-minute-while-live cache lives one level up, around the full Monte Carlo run, in
- * app/api/p/[slug]/analytics/simulate/route.ts -- that's the right place for "decrease
- * complexity" to apply, not here. */
+// Full-season resolution is 18 weeks of scores plus a Matchup Predictor lookup for every
+// not-yet-started game -- too expensive to redo on every request from every caller (team
+// schedule, projected wins, the leaderboard's Monte Carlo). Cached flat at
+// LEADERBOARD_RECOMPUTE_MS regardless of live state: the per-game *score* freshness guarantee
+// ("30s while live") is a Schedule-tab-only promise now (app/api/nfl/week/route.ts resolves each
+// game's win prob directly, without going through this cache, precisely so it isn't bound by this
+// TTL) -- this cache is only for the coarser, pool-wide aggregate views.
+const seasonGameDataCache = new Map<number, { data: { games: SimGame[]; hasLiveGame: boolean }; expiresAt: number }>();
+
+/** Public so API routes (a team's per-game schedule, projected wins, the leaderboard) can
+ * cross-reference a specific game's resolved hybrid probability by id, instead of each computing
+ * its own (divergent, FPI-only) pre-game number independently. Not used by the Schedule/Matchup
+ * tab -- that route resolves win probability directly per-game so it can refresh every 30s without
+ * waiting on this cache's 5-minute window. */
 export async function getSeasonGameData(year: number): Promise<{ games: SimGame[]; hasLiveGame: boolean }> {
-  return getFullSeasonGameData(year);
+  const cached = seasonGameDataCache.get(year);
+  if (cached && cached.expiresAt > Date.now()) return cached.data;
+  const data = await getFullSeasonGameData(year);
+  seasonGameDataCache.set(year, { data, expiresAt: Date.now() + LEADERBOARD_RECOMPUTE_MS });
+  return data;
 }
 
 /** Each team's projected wins for the full season: completed games count as 1/0/0.5 (not a

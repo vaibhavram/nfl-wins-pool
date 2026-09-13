@@ -1,9 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentRegularSeasonWeek, getSmartWeekScoreboard } from "@/lib/espn";
-import { getSeasonGameData } from "@/lib/simulation";
+import { getCurrentRegularSeasonWeek, getWeekScoreboard, getGamePredictor, type LiveGame } from "@/lib/espn";
+import { getHomeWinProbabilityFpi } from "@/lib/simulation";
 
 const MIN_WEEK = 1;
 const MAX_WEEK = 18;
+
+// Resolved directly per-game (not via lib/simulation.ts's getSeasonGameData) so this route never
+// waits on that function's 5-minute cache -- the Matchup/Schedule tab must reflect a game's real
+// win probability the moment it refreshes, not up to 5 minutes stale. Cheap: at most ~16 games,
+// vs. the ~270-game full-season resolution that cache exists to bound the cost of.
+async function resolveWinProb(g: LiveGame): Promise<number | null> {
+  if (g.state === "post") return null;
+  if (g.state === "in") return g.liveHomeWinProb;
+  const predicted = await getGamePredictor(g.id);
+  return predicted ?? (await getHomeWinProbabilityFpi(g.home, g.away));
+}
 
 export async function GET(req: NextRequest) {
   const requestedWeek = req.nextUrl.searchParams.get("week");
@@ -13,17 +24,8 @@ export async function GET(req: NextRequest) {
   if (!Number.isFinite(week)) week = currentWeek;
   week = Math.min(MAX_WEEK, Math.max(MIN_WEEK, week));
 
-  const live = await getSmartWeekScoreboard(week, year);
-  // Cross-reference the shared hybrid resolution by game id instead of computing a separate
-  // (FPI-only, live-unaware) probability here -- null hides the win-prob line entirely once a
-  // game is final, matching every other win-probability display in the app.
-  const { games: resolved } = await getSeasonGameData(year);
-  const resolvedById = new Map(resolved.map((g) => [g.id, g]));
-  const games = live.games.map((g) => {
-    const match = resolvedById.get(g.id);
-    const homeWinProb = match && match.state !== "post" ? match.pHomeWin : null;
-    return { ...g, homeWinProb };
-  });
+  const live = await getWeekScoreboard(week, year);
+  const games = await Promise.all(live.games.map(async (g) => ({ ...g, homeWinProb: await resolveWinProb(g) })));
 
   return NextResponse.json({
     week: live.week,

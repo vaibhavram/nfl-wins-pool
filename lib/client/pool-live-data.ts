@@ -5,6 +5,7 @@
 // itself stays untouched.
 import { useEffect, useState } from "react";
 import { useLivePolledFetch } from "../live-data";
+import { LEADERBOARD_RECOMPUTE_MS } from "../game-window";
 
 export type PoolSimulationResult = {
   manager: string; // a user_id
@@ -16,17 +17,17 @@ export type PoolSimulationResult = {
   p90Wins: number;
 };
 
-// Slower than the 20s live-data.ts default: the server itself only re-runs the Monte Carlo every
-// 5 minutes while a game is live (a deliberate cost tradeoff -- it's a heavier, pool-wide
-// aggregate, not a single number worth hammering), so polling faster than that would mostly just
-// re-fetch the same cached result.
-const SIM_POLL_MS = 60000;
-
+// Flat 5-minute cadence, active or not: the server itself only re-runs the Monte Carlo every
+// LEADERBOARD_RECOMPUTE_MS regardless of live state (it's a heavier, pool-wide aggregate, not a
+// single number worth refreshing as fast as a score), so polling faster would just re-fetch the
+// same cached result. Passing the same value for both active/idle cadence means this hook doesn't
+// need a live/settled distinction of its own.
 export function usePoolSimulation(slug: string) {
   const { data, loading, error } = useLivePolledFetch<{ results: PoolSimulationResult[]; hasLiveGame: boolean }>(
     `/api/p/${slug}/analytics/simulate`,
-    (d) => d.hasLiveGame,
-    SIM_POLL_MS,
+    () => true,
+    LEADERBOARD_RECOMPUTE_MS,
+    LEADERBOARD_RECOMPUTE_MS,
   );
   return { results: data?.results ?? [], loading, error };
 }
