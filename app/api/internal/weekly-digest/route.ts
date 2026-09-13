@@ -2,6 +2,7 @@ import { timingSafeEqual } from "crypto";
 import { NextResponse } from "next/server";
 import { getWeeklyDigests } from "@/lib/weekly-digest";
 import { renderLeaderboardImage } from "@/lib/leaderboard-image";
+import { storeEmailImage } from "@/lib/email-image-store";
 import { sendEmail } from "@/lib/email";
 import { escapeHtml } from "@/lib/format";
 
@@ -51,10 +52,11 @@ export async function POST(req: Request) {
       const recipients = previewTo ? [{ email: previewTo, name: previewTo }] : d.recipients;
       if (recipients.length === 0) continue;
       const imageBuffer = await renderLeaderboardImage(d.name, d.standingsRows);
-      const imageDataUri = `data:image/png;base64,${imageBuffer.toString("base64")}`;
+      const imageToken = storeEmailImage(imageBuffer);
+      const imageUrl = `${appUrl}/api/email-image/${imageToken}`;
       const link = `${appUrl}/p/${d.slug}/standings`;
       const subject = `${previewTo ? "[PREVIEW] " : ""}${d.name}: Week ${d.week} recap`;
-      const html = `<p>${escapeHtml(d.recap)}</p><p><img src="${imageDataUri}" alt="${escapeHtml(d.name)} standings" width="640" /></p><p><a href="${link}">View your pool</a></p>`;
+      const html = `<p>${escapeHtml(d.recap)}</p><p><img src="${imageUrl}" alt="${escapeHtml(d.name)} standings" width="640" /></p><p><a href="${link}">View your pool</a></p>`;
       const text = `${d.recap}\n\n${link}`;
 
       for (const r of recipients) {
