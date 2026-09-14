@@ -131,7 +131,8 @@ export function buildPrompt(
     `Things you could mention -- these are options, not a checklist. Pick whichever 1-2 are genuinely the most interesting this week, in whatever order reads best. Ignore the rest. Don't recompute these numbers, just narrate them:`,
     ...optionLines,
     "",
-    `Write a highly condensed, casual recap (strictly under 100 words) covering whichever of the above are worth telling this specific group about this week. Whenever you mention a game's outcome, name the participant(s) who own the teams involved (shown in parens above) so the group knows how it affected them -- don't just say "the Cardinals won," say who that helped or hurt. Second person plural ("you all"/"the group") is fine. Plain text only -- no markdown, no headers, no preamble like "Here's your recap."`,
+    `Write like a sharp, funny friend firing off a text to the group chat, not a sports-blog recap bot. Strictly under 100 words, and it does not need to be a single tidy paragraph covering everything -- one good line about one thing beats a rundown of three. Whenever you mention a game's outcome, name the participant(s) who own the teams involved (shown in parens above) so the group knows how it affected them -- don't just say "the Cardinals won," say who that helped or hurt.`,
+    `Avoid TV-announcer clichés -- don't write "absolutely dominated/demolished/torched", "the real shocker/story", or "meanwhile". Don't open with "[Name] + verb + stat" every time; vary how you start. Roast people a little if the data supports it. No markdown, no headers, no bullet points, no bold, no preamble like "Here's your recap" -- this goes straight into an email as plain sentences.`,
   ].join("\n");
 }
 

@@ -4,7 +4,7 @@ import { getWeeklyDigests } from "@/lib/weekly-digest";
 import { renderLeaderboardImage } from "@/lib/leaderboard-image";
 import { storeEmailImage } from "@/lib/email-image-store";
 import { sendEmail } from "@/lib/email";
-import { escapeHtml } from "@/lib/format";
+import { buildDigestEmail } from "@/lib/digest-email";
 
 // Same MIGRATE_SECRET bearer gate as the other /api/internal routes. Meant to be called once a
 // week (Tuesday morning) by an external scheduler -- see the Railway cron service pointed at this
@@ -50,18 +50,18 @@ export async function POST(req: Request) {
     let sent = 0;
 
     for (const d of digests) {
-      const recipients = previewTo ? [{ email: previewTo, name: previewTo }] : d.recipients;
+      const recipients = previewTo
+        ? [d.recipients.find((r) => r.email.toLowerCase() === previewTo.toLowerCase()) ?? { email: previewTo, name: "there" }]
+        : d.recipients;
       if (recipients.length === 0) continue;
       const imageBuffer = await renderLeaderboardImage(d.name, d.standingsRows);
       const imageToken = storeEmailImage(imageBuffer);
       const imageUrl = `${appUrl}/api/email-image/${imageToken}`;
       const link = `${appUrl}/p/${d.slug}/standings`;
-      const subject = `${previewTo ? "[PREVIEW] " : ""}${d.name}: Week ${d.week} recap`;
-      const html = `<p>${escapeHtml(d.recap)}</p><p><img src="${imageUrl}" alt="${escapeHtml(d.name)} standings" width="640" /></p><p><a href="${link}">View your pool</a></p>`;
-      const text = `${d.recap}\n\n${link}`;
 
       for (const r of recipients) {
-        await sendEmail({ to: r.email, subject, html, text });
+        const { subject, html, text } = buildDigestEmail({ name: r.name, poolName: d.name, week: d.week, recap: d.recap, imageUrl, link });
+        await sendEmail({ to: r.email, subject: previewTo ? `[PREVIEW] ${subject}` : subject, html, text });
         sent++;
       }
     }
