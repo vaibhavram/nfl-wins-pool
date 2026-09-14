@@ -39,6 +39,7 @@ const PREDICTOR_CONCURRENCY = 12; // courtesy cap -- don't fire ~270 requests at
  * (see getSeasonGameData). */
 export type SimGame = {
   id: string;
+  week: number;
   home: string;
   away: string;
   state: "pre" | "in" | "post";
@@ -67,7 +68,7 @@ async function getFullSeasonGameData(year: number): Promise<{ games: SimGame[]; 
   const weeks = await Promise.all(
     Array.from({ length: REGULAR_SEASON_WEEKS }, (_, i) => getWeekScoreboard(i + 1, year)),
   );
-  const allGames = weeks.flatMap((w) => w.games);
+  const allGames = weeks.flatMap((w, i) => w.games.map((g) => ({ ...g, week: i + 1 })));
 
   let hasLiveGame = false;
   const settled: SimGame[] = [];
@@ -77,10 +78,10 @@ async function getFullSeasonGameData(year: number): Promise<{ games: SimGame[]; 
     if (g.state === "post") {
       const fixedResult: SimGame["fixedResult"] =
         g.homeScore === g.awayScore ? "tie" : (g.homeScore ?? 0) > (g.awayScore ?? 0) ? "home" : "away";
-      settled.push({ id: g.id, home: g.home, away: g.away, state: g.state, pHomeWin: 0.5, fixedResult });
+      settled.push({ id: g.id, week: g.week, home: g.home, away: g.away, state: g.state, pHomeWin: 0.5, fixedResult });
     } else if (g.state === "in") {
       hasLiveGame = true;
-      settled.push({ id: g.id, home: g.home, away: g.away, state: g.state, pHomeWin: g.liveHomeWinProb ?? 0.5, fixedResult: null });
+      settled.push({ id: g.id, week: g.week, home: g.home, away: g.away, state: g.state, pHomeWin: g.liveHomeWinProb ?? 0.5, fixedResult: null });
     } else {
       pending.push(g);
     }
@@ -91,7 +92,7 @@ async function getFullSeasonGameData(year: number): Promise<{ games: SimGame[]; 
     const preGame = await mapWithConcurrency(pending, PREDICTOR_CONCURRENCY, async (g) => {
       const predicted = await getGamePredictor(g.id);
       const pHomeWin = predicted ?? fpiWinProbability(fpiRatings[g.home] ?? 0, fpiRatings[g.away] ?? 0);
-      return { id: g.id, home: g.home, away: g.away, state: g.state, pHomeWin, fixedResult: null } satisfies SimGame;
+      return { id: g.id, week: g.week, home: g.home, away: g.away, state: g.state, pHomeWin, fixedResult: null } satisfies SimGame;
     });
     settled.push(...preGame);
   }
@@ -348,6 +349,20 @@ export async function runSimulationHybrid(picks: Pick[], roster: string[], trial
   const { year } = await getCurrentRegularSeasonWeek();
   const { games, hasLiveGame } = await getSeasonGameData(year);
   return simulateSeason(picks, roster, games, year, "espn-hybrid", trials, hasLiveGame);
+}
+
+/** Runs the shared Monte Carlo engine directly against an already-resolved games list, bypassing
+ * getSeasonGameData's own fetch -- lets a caller pass in a modified copy of that same list (e.g.
+ * the weekly digest's "pre-week" counterfactual, which rolls one week's games back to their
+ * pre-game probabilities) instead of always resolving the current, actual state. */
+export async function runSimulationWithGames(
+  picks: Pick[],
+  roster: string[],
+  games: SimGame[],
+  year: number,
+  trials = DEFAULT_TRIALS,
+): Promise<SimulationSummary> {
+  return simulateSeason(picks, roster, games, year, "espn-hybrid-counterfactual", trials);
 }
 
 // ── Active model — everything in app/api/* imports these three names. Flip to the *Elo
