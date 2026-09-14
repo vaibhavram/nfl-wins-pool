@@ -90,7 +90,7 @@ function buildPrompt(
     `Precomputed highlights -- narrate these, don't recompute them:`,
     ...highlightLines,
     "",
-    `Write a highly condensed recap (strictly under 100 words). Lead with who had the best and worst week and why, referencing the pool win probability swing, then call out the upset result that shook up the leaderboard the most. Casual, direct tone, second person plural ("you all"/"the group") is fine. Plain text only -- no markdown, no headers, no preamble like "Here's your recap."`,
+    `Write a highly condensed recap (strictly under 100 words). Lead with who had the best and worst week and why, referencing the pool win probability swing -- spend most of the recap here. Then, in one sentence only, call out the upset result that shook up the leaderboard the most. Casual, direct tone, second person plural ("you all"/"the group") is fine. Plain text only -- no markdown, no headers, no preamble like "Here's your recap."`,
   ].join("\n");
 }
 
