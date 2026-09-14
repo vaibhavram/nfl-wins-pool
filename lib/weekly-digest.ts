@@ -5,12 +5,12 @@
 import "server-only";
 import { query } from "./db2";
 import { getPoolMembers } from "./pools-server";
-import { getSeasonPicks, getSeasonManagers } from "./season-server";
+import { getSeasonPicks, getSeasonManagers, type SeasonManager } from "./season-server";
 import { getTestExclusions } from "./admin-server";
 import { rostersFromPicks, totalWins } from "./draft";
 import { getCurrentRegularSeasonWeek, getWeekScoreboard, getStandings, getGamePredictor } from "./espn";
 import { getSeasonGameData, getHomeWinProbabilityFpi, runSimulationWithGames, type SimGame } from "./simulation";
-import { TEAM } from "./teams";
+import { TEAM, type TeamRecord } from "./teams";
 import { generateText } from "./llm";
 
 export type StandingsRow = { name: string; teams: string[]; wins: number; preWinPct: number; postWinPct: number };
@@ -22,6 +22,7 @@ export type PoolDigest = {
   week: number;
   year: number;
   standingsRows: StandingsRow[];
+  prompt: string;
   recap: string;
   recipients: { email: string; name: string }[];
 };
@@ -47,50 +48,90 @@ async function getPreGameHomeWinProb(home: string, away: string, gameId: string)
   return predicted ?? getHomeWinProbabilityFpi(home, away);
 }
 
-type UpsetCandidate = { winnerAb: string; loserAb: string; winnerScore: number; loserScore: number; winnerPreGamePct: number };
+export type GameResult =
+  | { kind: "tie"; ab1: string; ab2: string; score: number }
+  | { kind: "decisive"; winnerAb: string; loserAb: string; winnerScore: number; loserScore: number; winnerPreGamePct: number };
 
 /** Highest-magnitude upset among the week's completed games -- the team that won despite having
  * the lowest pre-game win probability. A cheap proxy for "which result shook up the leaderboard
  * the most" that doesn't require re-simulating the season once per game to measure its literal
  * counterfactual impact. */
-function biggestUpset(candidates: UpsetCandidate[]): UpsetCandidate | null {
-  if (candidates.length === 0) return null;
-  return candidates.reduce((a, b) => (b.winnerPreGamePct < a.winnerPreGamePct ? b : a));
+function biggestUpset(results: GameResult[]): Extract<GameResult, { kind: "decisive" }> | null {
+  const decisive = results.filter((r): r is Extract<GameResult, { kind: "decisive" }> => r.kind === "decisive");
+  if (decisive.length === 0) return null;
+  return decisive.reduce((a, b) => (b.winnerPreGamePct < a.winnerPreGamePct ? b : a));
 }
 
-function buildPrompt(
+/** Every mention of a game's outcome names the participant(s) who own the teams involved (a team
+ * undrafted in this pool just gets its name, no attribution) -- ownership is pool-specific, so
+ * this is called once per pool rather than shared across pools like the raw results are. */
+function formatGameResult(r: GameResult, ownerByTeam: Record<string, string>): string {
+  const named = (ab: string) => {
+    const full = TEAM[ab]?.full ?? ab;
+    const owner = ownerByTeam[ab];
+    return owner ? `${full} (${owner})` : full;
+  };
+  if (r.kind === "tie") return `${named(r.ab1)} tied ${named(r.ab2)} ${r.score}-${r.score}`;
+  return `${named(r.winnerAb)} beat ${named(r.loserAb)} ${r.winnerScore}-${r.loserScore} (had been a ${r.winnerPreGamePct.toFixed(0)}% pre-game favorite)`;
+}
+
+/** Teams still undefeated or still winless partway through the season -- a manager whose whole
+ * roster is riding one of those is a genuine multi-week trend, unlike a 1-0 record after just
+ * Week 1, which every winner trivially has. Gated to week > 1 for that reason: needs at least two
+ * games played to mean anything. Built from the season-long standings this codebase already
+ * fetches everywhere else, not a separate history log. */
+function buildStreakLines(rosters: Record<string, string[]>, managers: SeasonManager[], standings: Record<string, TeamRecord>, week: number): string[] {
+  if (week <= 1) return [];
+  const lines: string[] = [];
+  for (const m of managers) {
+    for (const ab of rosters[m.userId] ?? []) {
+      const rec = standings[ab];
+      if (!rec || rec.wins + rec.losses + rec.ties < 2) continue;
+      if (rec.losses === 0 && rec.ties === 0) lines.push(`${m.displayName}'s ${TEAM[ab]?.full ?? ab} are still undefeated at ${rec.wins}-0`);
+      else if (rec.wins === 0 && rec.ties === 0) lines.push(`${m.displayName}'s ${TEAM[ab]?.full ?? ab} are still winless at 0-${rec.losses}`);
+    }
+  }
+  return lines;
+}
+
+/** Exported (only) so scripts/preview-digest-prompt.ts can render the exact same prompt against
+ * fixture data for fast local iteration -- no DB or deploy needed to workshop the wording. */
+export function buildPrompt(
   poolName: string,
   week: number,
   standingsRows: StandingsRow[],
   gameLines: string[],
   best: { name: string; pre: number; post: number } | null,
   worst: { name: string; pre: number; post: number } | null,
-  upset: UpsetCandidate | null,
+  upsetLine: string | null,
+  streakLines: string[],
 ): string {
-  const standingsLines = standingsRows.map(
-    (r, i) => `${i + 1}. ${r.name} -- ${r.wins} wins, ${r.postWinPct.toFixed(1)}% to win the pool (was ${r.preWinPct.toFixed(1)}% before this week)`,
-  );
-  const highlightLines = [
-    best && `Best week: ${best.name}, pool win probability rose from ${best.pre.toFixed(1)}% to ${best.post.toFixed(1)}%`,
-    worst && `Worst week: ${worst.name}, pool win probability fell from ${worst.pre.toFixed(1)}% to ${worst.post.toFixed(1)}%`,
-    upset &&
-      `Most leaderboard-swinging result: ${TEAM[upset.winnerAb]?.full ?? upset.winnerAb} over ${TEAM[upset.loserAb]?.full ?? upset.loserAb} ${upset.winnerScore}-${upset.loserScore} -- ${TEAM[upset.winnerAb]?.full ?? upset.winnerAb} had been just a ${upset.winnerPreGamePct.toFixed(0)}% favorite`,
+  const standingsLines = standingsRows.map((r, i) => {
+    const delta = r.postWinPct - r.preWinPct;
+    const sign = delta >= 0 ? "+" : "";
+    return `${i + 1}. ${r.name} -- ${r.wins} wins, ${r.postWinPct.toFixed(1)}% to win the pool (${sign}${delta.toFixed(1)} pts this week)`;
+  });
+  const optionLines = [
+    best && `Biggest riser: ${best.name}, pool win probability up ${(best.post - best.pre).toFixed(1)} points (${best.pre.toFixed(1)}% -> ${best.post.toFixed(1)}%)`,
+    worst && `Biggest faller: ${worst.name}, pool win probability down ${(worst.pre - worst.post).toFixed(1)} points (${worst.pre.toFixed(1)}% -> ${worst.post.toFixed(1)}%)`,
+    upsetLine && `Biggest upset: ${upsetLine}`,
+    ...streakLines,
   ].filter((l): l is string => Boolean(l));
 
   return [
     `You are writing a short, punchy recap email for a friend group's NFL "wins pool" fantasy league called "${poolName}".`,
     `Each manager owns a few real NFL teams; a manager's score is the combined win total of their teams. Their "pool win probability" is their current live chance of winning the whole pool at season's end.`,
     "",
-    `Standings after Week ${week} (pool win probability shown is AFTER this week's games):`,
+    `Standings after Week ${week} (pool win probability shown is AFTER this week's games, with the point change from before this week in parens):`,
     ...standingsLines,
     "",
     `This week's results:`,
     ...gameLines,
     "",
-    `Precomputed highlights -- narrate these, don't recompute them:`,
-    ...highlightLines,
+    `Things you could mention -- these are options, not a checklist. Pick whichever 1-2 are genuinely the most interesting this week, in whatever order reads best. Ignore the rest. Don't recompute these numbers, just narrate them:`,
+    ...optionLines,
     "",
-    `Write a highly condensed recap (strictly under 100 words). Lead with who had the best and worst week and why, referencing the pool win probability swing -- spend most of the recap here. Then, in one sentence only, call out the upset result that shook up the leaderboard the most. Casual, direct tone, second person plural ("you all"/"the group") is fine. Plain text only -- no markdown, no headers, no preamble like "Here's your recap."`,
+    `Write a highly condensed, casual recap (strictly under 100 words) covering whichever of the above are worth telling this specific group about this week. Whenever you mention a game's outcome, name the participant(s) who own the teams involved (shown in parens above) so the group knows how it affected them -- don't just say "the Cardinals won," say who that helped or hurt. Second person plural ("you all"/"the group") is fine. Plain text only -- no markdown, no headers, no preamble like "Here's your recap."`,
   ].join("\n");
 }
 
@@ -124,30 +165,22 @@ export async function getWeeklyDigests(): Promise<PoolDigest[]> {
     g.week === week ? { ...g, fixedResult: null, pHomeWin: preGameProbByGameId.get(g.id) ?? 0.5 } : g,
   );
 
-  const gameLines: string[] = [];
-  const upsetCandidates: UpsetCandidate[] = [];
-  for (const g of completedWeekGames) {
+  const weekResults: GameResult[] = completedWeekGames.map((g) => {
     const homeScore = g.homeScore as number;
     const awayScore = g.awayScore as number;
-    const homeFull = TEAM[g.home]?.full ?? g.home;
-    const awayFull = TEAM[g.away]?.full ?? g.away;
-    if (homeScore === awayScore) {
-      gameLines.push(`${homeFull} tied ${awayFull} ${homeScore}-${awayScore}`);
-      continue;
-    }
+    if (homeScore === awayScore) return { kind: "tie", ab1: g.home, ab2: g.away, score: homeScore };
     const homeWon = homeScore > awayScore;
-    const winnerAb = homeWon ? g.home : g.away;
-    const loserAb = homeWon ? g.away : g.home;
-    const winnerScore = homeWon ? homeScore : awayScore;
-    const loserScore = homeWon ? awayScore : homeScore;
     const preGameHomeProb = preGameProbByGameId.get(g.id) ?? 0.5;
-    const winnerPreGamePct = (homeWon ? preGameHomeProb : 1 - preGameHomeProb) * 100;
-    gameLines.push(
-      `${TEAM[winnerAb]?.full ?? winnerAb} beat ${TEAM[loserAb]?.full ?? loserAb} ${winnerScore}-${loserScore} (had been a ${winnerPreGamePct.toFixed(0)}% pre-game favorite)`,
-    );
-    upsetCandidates.push({ winnerAb, loserAb, winnerScore, loserScore, winnerPreGamePct });
-  }
-  const upset = biggestUpset(upsetCandidates);
+    return {
+      kind: "decisive",
+      winnerAb: homeWon ? g.home : g.away,
+      loserAb: homeWon ? g.away : g.home,
+      winnerScore: homeWon ? homeScore : awayScore,
+      loserScore: homeWon ? awayScore : homeScore,
+      winnerPreGamePct: (homeWon ? preGameHomeProb : 1 - preGameHomeProb) * 100,
+    };
+  });
+  const upset = biggestUpset(weekResults);
 
   return Promise.all(
     pools.map(async (pool): Promise<PoolDigest> => {
@@ -158,6 +191,10 @@ export async function getWeeklyDigests(): Promise<PoolDigest[]> {
       ]);
       const roster = managers.map((m) => m.userId);
       const rosters = rostersFromPicks(picks, roster);
+      const ownerByTeam: Record<string, string> = {};
+      for (const m of managers) for (const ab of rosters[m.userId] ?? []) ownerByTeam[ab] = m.displayName;
+      const gameLines = weekResults.map((r) => formatGameResult(r, ownerByTeam));
+      const upsetLine = upset && formatGameResult(upset, ownerByTeam);
 
       const [preSim, postSim] = await Promise.all([
         runSimulationWithGames(picks, roster, preWeekGames, year),
@@ -184,10 +221,12 @@ export async function getWeeklyDigests(): Promise<PoolDigest[]> {
         if (!worst || delta < worst.post - worst.pre) worst = { name: r.name, pre: r.preWinPct, post: r.postWinPct };
       }
 
-      const recap = await generateText(buildPrompt(pool.name, week, standingsRows, gameLines, best, worst, upset));
+      const streakLines = buildStreakLines(rosters, managers, standings, week);
+      const prompt = buildPrompt(pool.name, week, standingsRows, gameLines, best, worst, upsetLine, streakLines);
+      const recap = await generateText(prompt);
       const recipients = members.filter((m) => m.email).map((m) => ({ email: m.email as string, name: m.display_name }));
 
-      return { poolId: pool.poolId, slug: pool.slug, name: pool.name, week, year, standingsRows, recap, recipients };
+      return { poolId: pool.poolId, slug: pool.slug, name: pool.name, week, year, standingsRows, prompt, recap, recipients };
     }),
   );
 }

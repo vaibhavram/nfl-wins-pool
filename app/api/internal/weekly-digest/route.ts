@@ -39,6 +39,7 @@ export async function POST(req: Request) {
           slug: d.slug,
           name: d.name,
           week: d.week,
+          prompt: d.prompt,
           recap: d.recap,
           recipients: d.recipients.map((r) => r.email),
         })),
