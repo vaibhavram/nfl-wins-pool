@@ -2,12 +2,15 @@ import { timingSafeEqual } from "crypto";
 import { NextResponse } from "next/server";
 import { getPoolBySlug, getCurrentSeason } from "@/lib/pools-server";
 import { getSeasonManagers, getSeasonPicks } from "@/lib/season-server";
-import { runSimulation } from "@/lib/simulation";
+import { getCurrentRegularSeasonWeek } from "@/lib/espn";
+import { runSimulation, runSimulationWithGames, getPreWeekGameData } from "@/lib/simulation";
 
 // Same MIGRATE_SECRET bearer gate as the other /api/internal routes. Debug/ops tool: runs the
 // real Monte Carlo simulation for one pool by slug, outside of a logged-in session -- the normal
 // /api/p/[slug]/analytics/simulate route requires requireMember(), which needs a real user
-// cookie this environment doesn't have. Body: { slug: string, trials?: number }.
+// cookie this environment doesn't have. Body: { slug: string, trials?: number, preWeek?: number }.
+// `preWeek: N` rolls week N's games back to their pre-game probability before simulating --
+// isolates how much of the result comes from that week's actual outcomes vs. roster strength.
 export async function POST(req: Request) {
   const secret = process.env.MIGRATE_SECRET;
   if (!secret) return NextResponse.json({ error: "MIGRATE_SECRET not configured" }, { status: 500 });
@@ -22,6 +25,7 @@ export async function POST(req: Request) {
   const body = await req.json().catch(() => ({}));
   const slug = typeof body?.slug === "string" ? body.slug : null;
   const trials = typeof body?.trials === "number" ? body.trials : undefined;
+  const preWeek = typeof body?.preWeek === "number" ? body.preWeek : null;
   if (!slug) return NextResponse.json({ ok: false, error: "slug is required" }, { status: 400 });
 
   try {
@@ -36,12 +40,20 @@ export async function POST(req: Request) {
     const picks = await getSeasonPicks(season.id);
 
     const start = Date.now();
-    const summary = await runSimulation(picks, roster, trials);
+    let summary;
+    if (preWeek !== null) {
+      const { year } = await getCurrentRegularSeasonWeek();
+      const games = await getPreWeekGameData(preWeek, year);
+      summary = await runSimulationWithGames(picks, roster, games, year, trials);
+    } else {
+      summary = await runSimulation(picks, roster, trials);
+    }
     const computeMs = Date.now() - start;
 
     return NextResponse.json({
       ok: true,
       pool: pool.name,
+      preWeek,
       trials: summary.trials,
       model: summary.model,
       hasLiveGame: summary.hasLiveGame,

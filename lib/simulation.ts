@@ -122,6 +122,27 @@ export async function getSeasonGameData(year: number): Promise<{ games: SimGame[
   return data;
 }
 
+/** getSeasonGameData's games with one week's results rolled back from their actual outcome to
+ * their pre-game probability -- simulates "what the season looked like right before that week
+ * kicked off," resolved the same way any other not-yet-started game is (Matchup Predictor,
+ * falling back to FPI). Diagnostic tool: isolates how much of a manager's current pool win
+ * probability comes from actual results in that week vs. from their roster's underlying
+ * (pre-season/pre-week) team strength -- see also lib/weekly-digest.ts's own, separate copy of
+ * this same idea for the "pre-week" digest highlight, kept independent so this doesn't risk that
+ * already-shipped feature. */
+export async function getPreWeekGameData(week: number, year: number): Promise<SimGame[]> {
+  const [{ games }, weekBoard] = await Promise.all([getSeasonGameData(year), getWeekScoreboard(week, year)]);
+  const completed = weekBoard.games.filter((g) => g.completed && g.homeScore !== null && g.awayScore !== null);
+  const preGameProbByGameId = new Map<string, number>();
+  await Promise.all(
+    completed.map(async (g) => {
+      const predicted = await getGamePredictor(g.id);
+      preGameProbByGameId.set(g.id, predicted ?? (await getHomeWinProbabilityFpi(g.home, g.away)));
+    }),
+  );
+  return games.map((g) => (g.week === week ? { ...g, fixedResult: null, pHomeWin: preGameProbByGameId.get(g.id) ?? 0.5 } : g));
+}
+
 /** Each team's projected wins for the full season: completed games count as 1/0/0.5 (not a
  * probability), live games use ESPN's live win probability, and games that haven't started yet
  * use the same hybrid pre-game model as the leaderboard -- summed per team across the whole
