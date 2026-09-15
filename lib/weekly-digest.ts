@@ -186,7 +186,11 @@ export async function getWeeklyDigests(): Promise<PoolDigest[]> {
   });
   const upset = biggestUpset(weekResults);
 
-  return Promise.all(
+  // Each pool is isolated: one pool's failure (an LLM hiccup, a data issue specific to that
+  // pool) shouldn't block every other pool's email too -- Promise.all over unguarded promises
+  // would reject the whole batch on a single rejection. Failures are logged and that pool is
+  // just skipped rather than surfaced as a fatal error for the whole run.
+  const settled = await Promise.allSettled(
     pools.map(async (pool): Promise<PoolDigest> => {
       const [picks, managers, members] = await Promise.all([
         getSeasonPicks(pool.seasonId),
@@ -233,4 +237,12 @@ export async function getWeeklyDigests(): Promise<PoolDigest[]> {
       return { poolId: pool.poolId, slug: pool.slug, name: pool.name, week, year, standingsRows, prompt, recap, recipients };
     }),
   );
+
+  const digests: PoolDigest[] = [];
+  for (let i = 0; i < settled.length; i++) {
+    const result = settled[i];
+    if (result.status === "fulfilled") digests.push(result.value);
+    else console.error(`Weekly digest failed for pool ${pools[i].slug} (${pools[i].name}):`, result.reason);
+  }
+  return digests;
 }
