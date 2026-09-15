@@ -7,16 +7,16 @@ import { buildPrompt, type StandingsRow } from "../lib/weekly-digest";
 import { generateText } from "../lib/llm";
 
 const standingsRows: StandingsRow[] = [
-  { name: "Rahul", teams: [], wins: 3, preWinPct: 26.2, postWinPct: 40.2 },
-  { name: "Leo", teams: [], wins: 2, preWinPct: 2.3, postWinPct: 2.7 },
-  { name: "Kaanchana", teams: [], wins: 2, preWinPct: 9.7, postWinPct: 11.9 },
-  { name: "Deepak", teams: [], wins: 2, preWinPct: 4.6, postWinPct: 4.5 },
-  { name: "Jong Ha", teams: [], wins: 1, preWinPct: 15.2, postWinPct: 10.8 },
-  { name: "Vaibhav", teams: [], wins: 1, preWinPct: 7.1, postWinPct: 5.8 },
-  { name: "Mohin", teams: [], wins: 1, preWinPct: 1.9, postWinPct: 1.6 },
-  { name: "Keyur", teams: [], wins: 1, preWinPct: 9.0, postWinPct: 5.7 },
-  { name: "Advait", teams: [], wins: 1, preWinPct: 15.6, postWinPct: 13.8 },
-  { name: "Akash", teams: [], wins: 0, preWinPct: 8.4, postWinPct: 3.1 },
+  { name: "Rahul", teams: ["BUF", "MIN", "NYG"], wins: 3, preWinPct: 26.2, postWinPct: 40.2 },
+  { name: "Leo", teams: ["SEA", "JAX", "CLE"], wins: 2, preWinPct: 2.3, postWinPct: 2.7 },
+  { name: "Kaanchana", teams: ["SF", "PIT", "ATL"], wins: 2, preWinPct: 9.7, postWinPct: 11.9 },
+  { name: "Deepak", teams: ["DET", "TEN", "CHI"], wins: 2, preWinPct: 4.6, postWinPct: 4.5 },
+  { name: "Jong Ha", teams: ["BAL", "CAR", "DAL"], wins: 1, preWinPct: 15.2, postWinPct: 10.8 },
+  { name: "Vaibhav", teams: ["HOU", "LV"], wins: 1, preWinPct: 7.1, postWinPct: 5.8 },
+  { name: "Mohin", teams: ["TB", "GB", "ARI"], wins: 1, preWinPct: 1.9, postWinPct: 1.6 },
+  { name: "Keyur", teams: ["NE", "IND", "PHI"], wins: 1, preWinPct: 9.0, postWinPct: 5.7 },
+  { name: "Advait", teams: ["CIN", "WSH"], wins: 1, preWinPct: 15.6, postWinPct: 13.8 },
+  { name: "Akash", teams: ["LAR", "NO", "LAC"], wins: 0, preWinPct: 8.4, postWinPct: 3.1 },
 ];
 
 const gameLines = [

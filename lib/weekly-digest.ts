@@ -109,7 +109,8 @@ export function buildPrompt(
   const standingsLines = standingsRows.map((r, i) => {
     const delta = r.postWinPct - r.preWinPct;
     const sign = delta >= 0 ? "+" : "";
-    return `${i + 1}. ${r.name} -- ${r.wins} wins, ${r.postWinPct.toFixed(1)}% to win the pool (${sign}${delta.toFixed(1)} pts this week)`;
+    const teamNames = r.teams.map((ab) => TEAM[ab]?.full ?? ab).join(", ");
+    return `${i + 1}. ${r.name} -- ${r.wins} wins, ${r.postWinPct.toFixed(1)}% to win the pool (${sign}${delta.toFixed(1)} pts this week) -- owns: ${teamNames}`;
   });
   const optionLines = [
     best && `Biggest riser: ${best.name}, pool win probability up ${(best.post - best.pre).toFixed(1)} points (${best.pre.toFixed(1)}% -> ${best.post.toFixed(1)}%)`,
@@ -131,8 +132,10 @@ export function buildPrompt(
     `Things you could mention -- these are options, not a checklist. Pick whichever 1-2 are genuinely the most interesting this week, in whatever order reads best. Ignore the rest. Don't recompute these numbers, just narrate them:`,
     ...optionLines,
     "",
-    `Write like a sharp, funny friend firing off a text to the group chat, not a sports-blog recap bot. Strictly under 100 words, and it does not need to be a single tidy paragraph covering everything -- one good line about one thing beats a rundown of three. Whenever you mention a game's outcome, name the participant(s) who own the teams involved (shown in parens above) so the group knows how it affected them -- don't just say "the Cardinals won," say who that helped or hurt.`,
-    `Avoid TV-announcer clichés -- don't write "absolutely dominated/demolished/torched", "the real shocker/story", or "meanwhile". Don't open with "[Name] + verb + stat" every time; vary how you start. Roast people a little if the data supports it. No markdown, no headers, no bullet points, no bold, no preamble like "Here's your recap" -- this goes straight into an email as plain sentences.`,
+    `Write like a warm, easygoing friend catching the group up, not a sports-blog recap bot -- some personality and light humor is good, but keep it friendly. Don't be harsh or mock anyone's week, especially early in the season when a bad week doesn't mean much yet; avoid violent/dramatic language for a loss (buried, crushed, annihilated, demolished, torched, dominated) -- describe a bad week lightly, not brutally.`,
+    `Under 100 words, hard limit -- count as you go. Pick just ONE thing from the options above to focus on; do not try to cover the riser, the faller, and the upset all in the same recap. One good line about one thing beats a rundown of everything.`,
+    `The first time you state a "pool win probability" or a bare percentage, briefly make clear what it means -- their simulated chance of winning the whole pool by the end of the season -- so it's clear to someone who's never seen this number before; don't just drop "40.8%" with no context. Whenever you mention a game's outcome or a manager's teams, use exactly the ownership shown above ("owns:" in the standings, and the parentheses in this week's results) -- don't guess, don't reassign whose team it is, and don't list a team as someone's unless it's shown there.`,
+    `Avoid TV-announcer clichés -- don't write "absolutely dominated/demolished/torched", "the real shocker/story", or "meanwhile". Don't open with "[Name] + verb + stat" every time; vary how you start. No markdown, no headers, no bullet points, no bold, no preamble like "Here's your recap" -- this goes straight into an email as plain sentences.`,
   ].join("\n");
 }
 
