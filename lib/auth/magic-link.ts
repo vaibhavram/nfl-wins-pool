@@ -2,6 +2,7 @@ import "server-only";
 import { randomBytes, createHash } from "crypto";
 import { query } from "../db2";
 import { sendEmail } from "../email";
+import { renderEmailHtml, emailParagraph } from "../email-template";
 
 const TOKEN_BYTES = 32;
 const EXPIRY_MS = 20 * 60 * 1000; // 20 minutes
@@ -21,28 +22,48 @@ function emailContent(
   link: string,
   inviteContext?: { inviterName: string; poolName: string },
 ): { subject: string; text: string; html: string } {
+  const expiryNote = "This link remains active for 20 minutes.";
+
   if (purpose === "join_pool" && inviteContext) {
     const { inviterName, poolName } = inviteContext;
-    const intro = `${inviterName} invited you to join ${poolName} on The Wins Pool. Please click the link below to accept the invite.`;
+    const intro = `${inviterName} invited you to join ${poolName} on The Wins Pool. Click below to accept the invite.`;
     return {
       subject: `${inviterName} invited you to ${poolName}`,
-      text: `${intro}\n\n${link}\n\nThis link remains active for 20 minutes.`,
-      html: `<p>${intro}</p><p><a href="${link}">Accept the invite</a></p><p>This link remains active for 20 minutes.</p>`,
+      text: `${intro}\n\n${link}\n\n${expiryNote}`,
+      html: renderEmailHtml({
+        title: poolName,
+        subtitle: "You're invited",
+        bodyHtml: emailParagraph(intro) + emailParagraph(expiryNote),
+        ctaText: "Accept the invite",
+        ctaHref: link,
+      }),
     };
   }
   if (purpose === "claim") {
     const intro = "You requested to link this email to your Wins Pool account. Click below to confirm.";
     return {
       subject: "Confirm your Wins Pool account",
-      text: `${intro}\n\n${link}\n\nThis link remains active for 20 minutes.`,
-      html: `<p>${intro}</p><p><a href="${link}">Confirm and sign in</a></p><p>This link remains active for 20 minutes.</p>`,
+      text: `${intro}\n\n${link}\n\n${expiryNote}`,
+      html: renderEmailHtml({
+        title: "The Wins Pool",
+        subtitle: "Confirm your account",
+        bodyHtml: emailParagraph(intro) + emailParagraph(expiryNote),
+        ctaText: "Confirm and sign in",
+        ctaHref: link,
+      }),
     };
   }
-  const intro = "You requested a sign-in link from The Wins Pool. Please click the link below to verify your email.";
+  const intro = "You requested a sign-in link from The Wins Pool. Click below to verify your email.";
   return {
     subject: "Your sign-in link",
-    text: `Hi,\n\n${intro} The link remains active for 20 minutes.\n\n${link}`,
-    html: `<p>Hi,</p><p>${intro} The link remains active for 20 minutes.</p><p><a href="${link}">Verify your email</a></p>`,
+    text: `Hi,\n\n${intro} ${expiryNote}\n\n${link}`,
+    html: renderEmailHtml({
+      title: "The Wins Pool",
+      subtitle: "Sign-in link",
+      bodyHtml: emailParagraph("Hi,") + emailParagraph(`${intro} ${expiryNote}`),
+      ctaText: "Verify your email",
+      ctaHref: link,
+    }),
   };
 }
 

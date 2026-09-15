@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { query } from "@/lib/db2";
 import { getTestExclusions } from "@/lib/admin-server";
 import { sendEmail } from "@/lib/email";
+import { renderEmailHtml, emailParagraph } from "@/lib/email-template";
 
 type TargetPool = { slug: string; name: string; email: string; memberCount: number };
 
@@ -70,7 +71,7 @@ export async function POST(req: Request) {
       to: t.email,
       subject: "Your wins pool is ready to draft!",
       text: `${intro}\n\n${link}`,
-      html: `<p>${intro}</p><p><a href="${link}">Go to your pool</a></p>`,
+      html: renderEmailHtml({ title: t.name, subtitle: "Ready to draft", bodyHtml: emailParagraph(intro), ctaText: "Go to your pool", ctaHref: link }),
     });
   }
 
@@ -81,7 +82,13 @@ export async function POST(req: Request) {
       to: t.email,
       subject: "Your wins pool still has open seats",
       text: `${intro}\n\n${link}`,
-      html: `<p>${intro}</p><p><a href="${link}">Invite more managers</a></p>`,
+      html: renderEmailHtml({
+        title: t.name,
+        subtitle: "Still filling",
+        bodyHtml: emailParagraph(intro),
+        ctaText: "Invite more managers",
+        ctaHref: link,
+      }),
     });
   }
 
