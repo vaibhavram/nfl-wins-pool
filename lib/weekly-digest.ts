@@ -115,12 +115,17 @@ export function buildPrompt(
     `This week's results:`,
     ...gameLines,
     "",
-    `Things you could mention -- these are options, not a checklist. Pick whichever 1-2 are genuinely the most interesting this week, in whatever order reads best. Ignore the rest. Don't recompute these numbers, just narrate them:`,
+    `Things you could mention -- these are options, not a checklist. Don't recompute these numbers, just narrate them:`,
     ...optionLines,
     "",
     `Write like a warm, easygoing friend catching the group up, not a sports-blog recap bot -- some personality and light humor is good, but keep it friendly. Don't be harsh or mock anyone's week, especially early in the season when a bad week doesn't mean much yet; avoid violent/dramatic language for a loss (buried, crushed, annihilated, demolished, torched, dominated) -- describe a bad week lightly, not brutally.`,
-    `Under 100 words, hard limit -- count as you go. Pick just ONE thing from the options above to focus on; do not try to cover the riser, the faller, and the upset all in the same recap. One good line about one thing beats a rundown of everything.`,
-    `The first time you state a "pool win probability" or a bare percentage, briefly make clear what it means -- their simulated chance of winning the whole pool by the end of the season -- so it's clear to someone who's never seen this number before; don't just drop "40.8%" with no context. Whenever you mention a game's outcome or a manager's teams, use exactly the ownership shown above ("owns:" in the standings, and the parentheses in this week's results) -- don't guess, don't reassign whose team it is, and don't list a team as someone's unless it's shown there.`,
+    `Under 100 words, hard limit -- count as you go. Mention at least 2-3 different participants by name, not just the single biggest mover -- e.g. touch on a riser, a faller, and/or the upset, one short clause each, rather than a full paragraph about only one person. Breadth over depth: several quick one-liners beats one person getting the whole recap.`,
+    ...(week <= 6
+      ? [
+          `This is early in the season (Week ${week} of 18) -- frame it so everyone still feels like they have a real shot. Don't use language that suggests the race is already decided (no "clear favorite," "running away with it," "lock," "no chance," etc.) -- a hot start is one good data point, not a verdict, and there's a long way to go.`,
+        ]
+      : []),
+    `The first time you state a "pool win probability" or a bare percentage, briefly make clear what it means -- keep it simple, e.g. "chance of winning the pool" -- so it's clear to someone who's never seen this number before; don't just drop "40.8%" with no context, but don't over-explain it either (no need for "simulated" or "by season's end"). Whenever you mention a game's outcome or a manager's teams, use exactly the ownership shown above ("owns:" in the standings, and the parentheses in this week's results) -- don't guess, don't reassign whose team it is, and don't list a team as someone's unless it's shown there. If you state how many wins/losses someone has, use the exact number given in the standings above -- don't round up, exaggerate, or invent a streak ("three straight wins") that isn't literally shown.`,
     `Avoid TV-announcer clichés -- don't write "absolutely dominated/demolished/torched", "the real shocker/story", or "meanwhile". Don't open with "[Name] + verb + stat" every time; vary how you start. No markdown, no headers, no bullet points, no bold, no preamble like "Here's your recap" -- this goes straight into an email as plain sentences.`,
   ].join("\n");
 }
