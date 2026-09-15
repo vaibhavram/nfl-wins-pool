@@ -55,6 +55,22 @@ export async function getTestExclusions(): Promise<{ userIds: string[]; poolIds:
   return { userIds, poolIds: poolRows.map((r) => r.id) };
 }
 
+export type InSeasonPool = { poolId: string; slug: string; name: string; seasonId: string };
+
+/** Every non-test pool whose current season is actively underway (draft complete, games being
+ * played) -- shared by anything that needs to run once per pool per day/week while the season is
+ * live: the Tuesday digest email, the daily win-probability snapshot job, etc. */
+export async function getInSeasonPools(): Promise<InSeasonPool[]> {
+  const { poolIds } = await getTestExclusions();
+  const rows = await query<{ pool_id: string; slug: string; name: string; season_id: string }>(
+    `SELECT ps.pool_id, p.slug, p.name, ps.id AS season_id
+     FROM pool_seasons ps JOIN pools p ON p.id = ps.pool_id
+     WHERE ps.status = 'in_season' AND p.id <> ALL($1::uuid[])`,
+    [poolIds],
+  );
+  return rows.map((r) => ({ poolId: r.pool_id, slug: r.slug, name: r.name, seasonId: r.season_id }));
+}
+
 export type AdminStats = {
   totalUsers: number;
   totalPools: number;

@@ -3,10 +3,9 @@
 // all league-wide, so they're fetched/built once and reused across every pool instead of once per
 // pool -- only each pool's picks/roster (and therefore its two Monte Carlo runs) differ per pool.
 import "server-only";
-import { query } from "./db2";
 import { getPoolMembers } from "./pools-server";
 import { getSeasonPicks, getSeasonManagers, type SeasonManager } from "./season-server";
-import { getTestExclusions } from "./admin-server";
+import { getInSeasonPools } from "./admin-server";
 import { rostersFromPicks, totalWins } from "./draft";
 import { getCurrentRegularSeasonWeek, getWeekScoreboard, getStandings, getGamePredictor } from "./espn";
 import { getSeasonGameData, getHomeWinProbabilityFpi, runSimulationWithGames, type SimGame } from "./simulation";
@@ -26,19 +25,6 @@ export type PoolDigest = {
   recap: string;
   recipients: { email: string; name: string }[];
 };
-
-type InSeasonPool = { poolId: string; slug: string; name: string; seasonId: string };
-
-async function getInSeasonPools(): Promise<InSeasonPool[]> {
-  const { poolIds } = await getTestExclusions();
-  const rows = await query<{ pool_id: string; slug: string; name: string; season_id: string }>(
-    `SELECT ps.pool_id, p.slug, p.name, ps.id AS season_id
-     FROM pool_seasons ps JOIN pools p ON p.id = ps.pool_id
-     WHERE ps.status = 'in_season' AND p.id <> ALL($1::uuid[])`,
-    [poolIds],
-  );
-  return rows.map((r) => ({ poolId: r.pool_id, slug: r.slug, name: r.name, seasonId: r.season_id }));
-}
 
 /** A completed game's pre-game win probability isn't retained on SimGame (completed games there
  * just carry a 0.5 placeholder -- see lib/simulation.ts), so it's re-resolved here the same way
