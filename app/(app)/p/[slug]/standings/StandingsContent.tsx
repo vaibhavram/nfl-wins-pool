@@ -34,7 +34,7 @@ export function StandingsContent({
   isCommissioner: boolean;
 }) {
   const router = useRouter();
-  const { standings, loading, error } = useStandings();
+  const { standings, error } = useStandings();
   const { results: simResults } = usePoolSimulation(slug);
 
   const winPctByUserId = useMemo(() => {
@@ -67,12 +67,12 @@ export function StandingsContent({
       <div style={{ flex: "none", padding: "8px 20px 12px", display: "flex", alignItems: "flex-end", justifyContent: "space-between", borderBottom: "1px solid var(--color-divider)" }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
           <h4 style={{ margin: 0, fontSize: 19, color: "var(--color-text)" }}>Standings</h4>
-          <div style={{ fontSize: 12, color: "var(--color-neutral-500)" }}>
-            {loading ? "Loading live standings…" : error ? "Standings unavailable" : "Live standings"} · {managers.length} managers
-          </div>
+          {/* Only surfaced when the live fetch actually failed -- the steady-state "Live standings
+              · N managers" line restated what the screen already shows. Silently rendering zeros
+              for everyone would be worse than a word of explanation. */}
+          {error && <div style={{ fontSize: 12, color: "var(--color-neutral-500)" }}>Standings unavailable</div>}
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ fontSize: 11.5, color: "var(--color-neutral-600)" }}>Wins</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
           <SaveLeaderboardButton slug={slug} poolName={poolName} />
           <SettingsGearLink slug={slug} isCommissioner={isCommissioner} />
         </div>
@@ -121,14 +121,33 @@ export function StandingsContent({
                         style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2, cursor: "pointer" }}
                       >
                         <TeamLogo ab={ab} size={26} />
-                        <div style={{ fontFamily: "ui-monospace,monospace", fontSize: 11, color: "var(--color-neutral-400)" }}>
+                        <div style={{ fontFamily: "ui-monospace,monospace", fontSize: 11, color: "var(--color-neutral-400)", minWidth: 26, textAlign: "center", fontVariantNumeric: "tabular-nums" }}>
                           {fmtWins(standings[ab] ? standings[ab].wins + standings[ab].ties * 0.5 : 0)}
                         </div>
                       </div>
                     ))}
                   </div>
                 </div>
-                <div style={{ fontFamily: "var(--font-heading)", fontSize: 22, fontWeight: 500, color: mine ? "var(--color-accent-200)" : "var(--color-text)" }}>
+                <div
+                  style={{
+                    fontFamily: "var(--font-heading)",
+                    fontSize: 22,
+                    fontWeight: 500,
+                    color: mine ? "var(--color-accent-200)" : "var(--color-text)",
+                    // Half-win totals ("12.5") are wider than whole ones, and without a reserved
+                    // column that extra width pushes the crests left on exactly the rows that
+                    // have one -- so the crests stop lining up down the page the week a game
+                    // ends in a tie. Fixed width + tabular figures keeps every row identical.
+                    // minWidth, not width: the widest total the season can produce is four
+                    // characters ("18.5"), so this floor is never exceeded and every row renders
+                    // the same column -- but a surprise wider value would still be readable
+                    // rather than clipped.
+                    minWidth: 52,
+                    flex: "none",
+                    textAlign: "right",
+                    fontVariantNumeric: "tabular-nums",
+                  }}
+                >
                   {fmtWins(r.wins)}
                 </div>
                 <div style={{ fontSize: 16, color: "var(--color-neutral-600)", flex: "none" }}>›</div>

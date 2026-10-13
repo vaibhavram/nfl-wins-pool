@@ -64,3 +64,12 @@ export function CameraIcon() {
     </svg>
   );
 }
+
+export function GearIcon() {
+  return (
+    <svg {...commonProps}>
+      <circle cx="12" cy="12" r="3.2" />
+      <path d="M12 3.5V6M12 18V20.5M20.5 12H18M6 12H3.5M18.01 6L16.25 7.76M7.75 16.25L5.99 18.01M18.01 18.01L16.25 16.25M7.75 7.75L5.99 5.99" />
+    </svg>
+  );
+}

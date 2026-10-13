@@ -63,8 +63,24 @@ export async function renderLeaderboardImage(poolName: string, rows: Leaderboard
               </div>
               <div style={{ display: "flex", gap: 6 }}>
                 {r.teams.map((ab) => (
-                  // eslint-disable-next-line @next/next/no-img-element -- Satori image node, not a browser <img>
-                  <img key={ab} src={TEAM[ab]?.logo} width={26} height={26} alt={ab} />
+                  // The same dark-on-dark problem the app's TeamLogo solves with a drop-shadow
+                  // halo (Giants, Rams and friends vanish into the background). Satori supports
+                  // no CSS filters, so the halo is a soft radial wash behind the crest instead.
+                  <div
+                    key={ab}
+                    style={{
+                      display: "flex",
+                      width: 26,
+                      height: 26,
+                      alignItems: "center",
+                      justifyContent: "center",
+                      borderRadius: 13,
+                      background: "radial-gradient(circle, rgba(255,255,255,0.20) 0%, rgba(255,255,255,0) 72%)",
+                    }}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element -- Satori image node, not a browser <img> */}
+                    <img src={TEAM[ab]?.logo} width={26} height={26} alt={ab} />
+                  </div>
                 ))}
               </div>
               <div style={{ display: "flex", width: 56, justifyContent: "flex-end", color: TEXT, fontSize: 20 }}>
