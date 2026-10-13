@@ -29,7 +29,7 @@ import { LEADERBOARD_RECOMPUTE_MS } from "./game-window";
 
 const TIE_PROBABILITY = 0.006; // ~1 in 165 games — roughly the modern-NFL tie rate
 const DEFAULT_TRIALS = 10000; // halved from 20k to keep re-simulating cheap while a game is live
-const REGULAR_SEASON_WEEKS = 18;
+export const REGULAR_SEASON_WEEKS = 18;
 const PREDICTOR_CONCURRENCY = 12; // courtesy cap -- don't fire ~270 requests at ESPN all at once
 
 /** `fixedResult` set means "apply this every trial, don't sample" (a completed game); null means

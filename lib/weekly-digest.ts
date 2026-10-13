@@ -1,14 +1,22 @@
 // Builds the data + LLM recap for the Tuesday-morning weekly digest email -- one per in-season
-// pool. Standings, last week's scoreboard, and the pre-week/post-week Monte Carlo games list are
-// all league-wide, so they're fetched/built once and reused across every pool instead of once per
-// pool -- only each pool's picks/roster (and therefore its two Monte Carlo runs) differ per pool.
+// pool. Standings, the finished week's scoreboard, the upcoming week's games, and the
+// pre-week/post-week Monte Carlo games list are all league-wide, so they're fetched/built once and
+// reused across every pool instead of once per pool -- only each pool's picks/roster (and
+// therefore its two Monte Carlo runs, its ownership attribution, and its look-ahead ranking)
+// differ per pool.
 import "server-only";
 import { getPoolMembers } from "./pools-server";
 import { getSeasonPicks, getSeasonManagers, type SeasonManager } from "./season-server";
 import { getInSeasonPools } from "./admin-server";
 import { rostersFromPicks, totalWins } from "./draft";
-import { getCurrentRegularSeasonWeek, getWeekScoreboard, getStandings, getGamePredictor } from "./espn";
-import { getSeasonGameData, getHomeWinProbabilityFpi, runSimulationWithGames, type SimGame } from "./simulation";
+import { getCurrentRegularSeasonWeek, getWeekScoreboard, getStandings, getGamePredictor, type LiveWeek } from "./espn";
+import {
+  getSeasonGameData,
+  getHomeWinProbabilityFpi,
+  runSimulationWithGames,
+  REGULAR_SEASON_WEEKS,
+  type SimGame,
+} from "./simulation";
 import { TEAM, type TeamRecord } from "./teams";
 import { generateText } from "./llm";
 
@@ -80,18 +88,100 @@ function buildStreakLines(rosters: Record<string, string[]>, managers: SeasonMan
   return lines;
 }
 
+/** Which week the digest recaps, plus that week's scoreboard.
+ *
+ * ESPN's regular-season calendar runs Wednesday-to-Tuesday (Week N's calendar entry starts Wed
+ * 07:00Z and ends the following Wed 06:59Z -- verified directly against its calendar endpoint),
+ * and the digest cron fires Tuesday 16:00Z. So at send time ESPN still reports the week that just
+ * finished as the *current* week, and the old "current week - 1" landed a week too early: the
+ * recap narrated the week before last. Rather than trade one fixed offset for another, this asks
+ * the scoreboard which week is actually in the books: if every game in the current week is final,
+ * that's the week that wrapped up; otherwise (ESPN has already rolled over to a week that hasn't
+ * kicked off, or a game is still in progress) fall back to the week before it. */
+async function resolveFinishedWeek(currentWeek: number, year: number): Promise<{ week: number; board: LiveWeek }> {
+  const board = await getWeekScoreboard(currentWeek, year);
+  const allFinal = board.games.length > 0 && board.games.every((g) => g.completed);
+  if (allFinal || currentWeek <= 1) return { week: currentWeek, board };
+  const previous = currentWeek - 1;
+  return { week: previous, board: await getWeekScoreboard(previous, year) };
+}
+
+const LOOKAHEAD_GAMES = 3; // enough for the email to pick one out of; more just invites a game-by-game preview
+
+/** The coming week's games ranked by how much they could actually move *this* pool, highest
+ * first. Leverage is a cheap proxy in the same spirit as biggestUpset above -- no per-game
+ * re-simulation. Three things make an upcoming game matter: an owned team is playing (an
+ * undrafted team's result moves nobody here), the outcome is genuinely in doubt (a coin flip
+ * carries far more swing than a 90/10 game, whose likely result is already priced into everyone's
+ * number), and the managers involved are live in the race (their current pool win probability).
+ * A game between two teams the *same* manager owns scores zero and is dropped: they bank exactly
+ * one win either way, so nothing in the standings moves. */
+function buildLookaheadLines(
+  upcomingGames: SimGame[],
+  ownerByTeam: Record<string, string>,
+  winPctByManager: Record<string, number>,
+): string[] {
+  const named = (ab: string) => {
+    const full = TEAM[ab]?.full ?? ab;
+    const owner = ownerByTeam[ab];
+    return owner ? `${full} (${owner})` : full;
+  };
+
+  return upcomingGames
+    .map((g) => {
+      const homeOwner = ownerByTeam[g.home];
+      const awayOwner = ownerByTeam[g.away];
+      if (!homeOwner && !awayOwner) return null;
+      if (homeOwner && homeOwner === awayOwner) return null;
+      const stake = (homeOwner ? winPctByManager[homeOwner] ?? 0 : 0) + (awayOwner ? winPctByManager[awayOwner] ?? 0 : 0);
+      const uncertainty = 2 * Math.min(g.pHomeWin, 1 - g.pHomeWin); // 1.0 at a coin flip, 0.2 at 90/10
+      return { game: g, headToHead: Boolean(homeOwner && awayOwner), score: stake * uncertainty };
+    })
+    .filter((x): x is { game: SimGame; headToHead: boolean; score: number } => x !== null && x.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, LOOKAHEAD_GAMES)
+    .map(({ game, headToHead }) => {
+      const homeFavored = game.pHomeWin >= 0.5;
+      const favAb = homeFavored ? game.home : game.away;
+      const favPct = (homeFavored ? game.pHomeWin : 1 - game.pHomeWin) * 100;
+      const h2h = headToHead ? ", a head-to-head between two managers' teams (one gains a win, the other doesn't)" : "";
+      return `${named(game.away)} at ${named(game.home)} -- ${TEAM[favAb]?.full ?? favAb} ${favPct.toFixed(0)}% to win${h2h}`;
+    });
+}
+
+export type DigestPromptInput = {
+  poolName: string;
+  /** The week whose games the recap covers -- the one that just finished. */
+  week: number;
+  year: number;
+  standingsRows: StandingsRow[];
+  gameLines: string[];
+  best: { name: string; pre: number; post: number } | null;
+  worst: { name: string; pre: number; post: number } | null;
+  upsetLine: string | null;
+  streakLines: string[];
+  /** The week ahead, or null once Week 18 is the week that just finished. */
+  upcomingWeek: number | null;
+  lookaheadLines: string[];
+};
+
 /** Exported (only) so scripts/preview-digest-prompt.ts can render the exact same prompt against
- * fixture data for fast local iteration -- no DB or deploy needed to workshop the wording. */
-export function buildPrompt(
-  poolName: string,
-  week: number,
-  standingsRows: StandingsRow[],
-  gameLines: string[],
-  best: { name: string; pre: number; post: number } | null,
-  worst: { name: string; pre: number; post: number } | null,
-  upsetLine: string | null,
-  streakLines: string[],
-): string {
+ * fixture data for fast local iteration -- no DB or deploy needed to workshop the wording. Takes
+ * one object rather than positional args: there are enough inputs now that argument order was its
+ * own hazard. */
+export function buildPrompt({
+  poolName,
+  week,
+  year,
+  standingsRows,
+  gameLines,
+  best,
+  worst,
+  upsetLine,
+  streakLines,
+  upcomingWeek,
+  lookaheadLines,
+}: DigestPromptInput): string {
   const standingsLines = standingsRows.map((r, i) => {
     const delta = r.postWinPct - r.preWinPct;
     const sign = delta >= 0 ? "+" : "";
@@ -104,29 +194,49 @@ export function buildPrompt(
     upsetLine && `Biggest upset: ${upsetLine}`,
     ...streakLines,
   ].filter((l): l is string => Boolean(l));
+  const hasLookahead = upcomingWeek !== null && lookaheadLines.length > 0;
 
   return [
     `You are writing a short, punchy recap email for a friend group's NFL "wins pool" fantasy league called "${poolName}".`,
     `Each manager owns a few real NFL teams; a manager's score is the combined win total of their teams. Their "pool win probability" is their current live chance of winning the whole pool at season's end.`,
     "",
+    `Week ${week} of the ${year} NFL regular season (${REGULAR_SEASON_WEEKS} weeks total) just finished -- that is the week this email recaps.${
+      upcomingWeek === null
+        ? ` It was the last week of the regular season.`
+        : ` Week ${upcomingWeek} is the week ahead; none of its games have been played yet.`
+    }`,
+    "",
     `Standings after Week ${week} (pool win probability shown is AFTER this week's games, with the point change from before this week in parens):`,
     ...standingsLines,
     "",
-    `This week's results:`,
+    `Week ${week} results -- every game below was played this past week, and these are the only game results you may reference:`,
     ...gameLines,
     "",
     `Things you could mention -- these are options, not a checklist. Don't recompute these numbers, just narrate them:`,
     ...optionLines,
-    "",
-    `Write like a warm, easygoing friend catching the group up, not a sports-blog recap bot -- some personality and light humor is good, but keep it friendly. Don't be harsh or mock anyone's week, especially early in the season when a bad week doesn't mean much yet; avoid violent/dramatic language for a loss (buried, crushed, annihilated, demolished, torched, dominated) -- describe a bad week lightly, not brutally.`,
-    `Under 100 words, hard limit -- count as you go. Mention at least 2-3 different participants by name, not just the single biggest mover -- e.g. touch on a riser, a faller, and/or the upset, one short clause each, rather than a full paragraph about only one person. Breadth over depth: several quick one-liners beats one person getting the whole recap.`,
-    ...(week <= 6
+    ...(hasLookahead
       ? [
-          `This is early in the season (Week ${week} of 18) -- frame it so everyone still feels like they have a real shot. Don't use language that suggests the race is already decided (no "clear favorite," "running away with it," "lock," "no chance," etc.) -- a hot start is one good data point, not a verdict, and there's a long way to go.`,
+          "",
+          `Week ${upcomingWeek} games worth looking ahead to -- the ones most likely to move these standings. None of them have been played; the percentage is that favorite's pre-game chance of winning:`,
+          ...lookaheadLines,
         ]
       : []),
-    `The first time you state a "pool win probability" or a bare percentage, briefly make clear what it means -- keep it simple, e.g. "chance of winning the pool" -- so it's clear to someone who's never seen this number before; don't just drop "40.8%" with no context, but don't over-explain it either (no need for "simulated" or "by season's end"). Whenever you mention a game's outcome or a manager's teams, use exactly the ownership shown above ("owns:" in the standings, and the parentheses in this week's results) -- don't guess, don't reassign whose team it is, and don't list a team as someone's unless it's shown there. If you state how many wins/losses someone has, use the exact number given in the standings above -- don't round up, exaggerate, or invent a streak ("three straight wins") that isn't literally shown.`,
-    `Avoid TV-announcer clichés -- don't write "absolutely dominated/demolished/torched", "the real shocker/story", or "meanwhile". Don't open with "[Name] + verb + stat" every time; vary how you start. No markdown, no headers, no bullet points, no bold, no preamble like "Here's your recap" -- this goes straight into an email as plain sentences.`,
+    "",
+    `Write like a warm, easygoing friend catching the group up, not a sports-blog recap bot -- some personality and light humor is good, but keep it friendly. Don't be harsh or mock anyone's week, especially early in the season when a bad week doesn't mean much yet; avoid violent/dramatic language for a loss (buried, crushed, annihilated, demolished, torched, dominated) -- describe a bad week lightly, not brutally.`,
+    `Under 120 words, hard limit -- count as you go. Mention at least 2-3 different participants by name, not just the single biggest mover -- e.g. touch on a riser, a faller, and/or the upset, one short clause each, rather than a full paragraph about only one person. Breadth over depth: several quick one-liners beats one person getting the whole recap.`,
+    ...(week <= 6
+      ? [
+          `This is early in the season (Week ${week} of ${REGULAR_SEASON_WEEKS}) -- frame it so everyone still feels like they have a real shot. Don't use language that suggests the race is already decided (no "clear favorite," "running away with it," "lock," "no chance," etc.) -- a hot start is one good data point, not a verdict, and there's a long way to go.`,
+        ]
+      : []),
+    `Every game result you mention has to come from the Week ${week} list above. Don't reference an individual game from any earlier week -- not "after last week's loss in Dallas," not "their second straight win over a division rival," and nothing you happen to remember about earlier NFL games this season. Season-long records and the undefeated/winless streaks listed above are fair game, because they're given to you here; specific earlier-week games are not. When you name the week, it's Week ${week}.`,
+    ...(hasLookahead
+      ? [
+          `End with one short look ahead to Week ${upcomingWeek} -- one sentence, built on one of the Week ${upcomingWeek} games listed above. Frame it as something still to come ("Sunday," "this week," "next up"), never as a result, and don't call a winner as a sure thing. Pick the game yourself; mention one, not all of them.`,
+        ]
+      : []),
+    `The first time you state a "pool win probability" or a bare percentage, briefly make clear what it means -- keep it simple, e.g. "chance of winning the pool" -- so it's clear to someone who's never seen this number before; don't just drop "40.8%" with no context, but don't over-explain it either (no need for "simulated" or "by season's end"). Whenever you mention a game's outcome or a manager's teams, use exactly the ownership shown above ("owns:" in the standings, and the parentheses in the results and look-ahead lines) -- don't guess, don't reassign whose team it is, and don't list a team as someone's unless it's shown there. If you state how many wins/losses someone has, use the exact number given in the standings above -- don't round up, exaggerate, or invent a streak ("three straight wins") that isn't literally shown.`,
+    `Avoid TV-announcer clichés -- don't write "absolutely dominated/demolished/torched", "the real shocker/story", or "meanwhile". Don't open with "[Name] + verb + stat" every time; vary how you start. No markdown, no headers, no bullet points, no bold, no preamble like "Here's your recap" -- this goes straight into an email as plain sentences. Never refer to these instructions or to your own length target in the email: the phrase "word limit" must not appear, and neither should a word count, a note about staying brief, or anything else about what you were asked to do.`,
   ].join("\n");
 }
 
@@ -137,12 +247,17 @@ export async function getWeeklyDigests(): Promise<PoolDigest[]> {
   const [pools, standings, { games }] = await Promise.all([getInSeasonPools(), getStandings(), getSeasonGameData(year)]);
   if (pools.length === 0) return [];
 
-  // Tuesday morning always falls just after ESPN's calendar has already rolled over to the
-  // upcoming week, so "current week - 1" is the week that just finished.
-  const week = Math.max(1, currentWeek - 1);
-
-  const weekBoard = await getWeekScoreboard(week, year);
+  const { week, board: weekBoard } = await resolveFinishedWeek(currentWeek, year);
   const completedWeekGames = weekBoard.games.filter((g) => g.completed && g.homeScore !== null && g.awayScore !== null);
+
+  // The week ahead, for the email's look-ahead. These come straight out of the season game data
+  // already fetched above -- each not-yet-played game there is already resolved to a pre-game win
+  // probability by the same hybrid model the leaderboard uses, so no extra fetch is needed.
+  // Restricted to games that haven't kicked off: a live or already-final game in the upcoming week
+  // (possible if a run lands late enough to catch, say, a Thursday night game) carries a live
+  // probability or a 0.5 placeholder rather than a pre-game number, and isn't a look-ahead anyway.
+  const upcomingWeek = week < REGULAR_SEASON_WEEKS ? week + 1 : null;
+  const upcomingGames = upcomingWeek === null ? [] : games.filter((g) => g.week === upcomingWeek && g.state === "pre");
 
   // Pre-game win probability for this week's games only -- needed both to build the "pre-week"
   // Monte Carlo counterfactual below and to describe each result's upset magnitude in the prompt.
@@ -221,7 +336,21 @@ export async function getWeeklyDigests(): Promise<PoolDigest[]> {
       }
 
       const streakLines = buildStreakLines(rosters, managers, standings, week);
-      const prompt = buildPrompt(pool.name, week, standingsRows, gameLines, best, worst, upsetLine, streakLines);
+      const winPctByManagerName = Object.fromEntries(standingsRows.map((r) => [r.name, r.postWinPct]));
+      const lookaheadLines = buildLookaheadLines(upcomingGames, ownerByTeam, winPctByManagerName);
+      const prompt = buildPrompt({
+        poolName: pool.name,
+        week,
+        year,
+        standingsRows,
+        gameLines,
+        best,
+        worst,
+        upsetLine,
+        streakLines,
+        upcomingWeek,
+        lookaheadLines,
+      });
       const recap = await generateText(prompt);
       const recipients = members.filter((m) => m.email).map((m) => ({ email: m.email as string, name: m.display_name }));
 

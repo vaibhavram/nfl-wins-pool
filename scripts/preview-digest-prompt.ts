@@ -42,7 +42,27 @@ const worst = { name: "Akash", pre: 8.4, post: 3.1 };
 const upsetLine = "Arizona Cardinals (Mohin) beat L.A. Chargers (Akash) 26-14 (had been a 32% pre-game favorite)";
 const streakLines: string[] = []; // week 1 -- no multi-week streaks yet
 
-const prompt = buildPrompt("Vaibhav's friends", 1, standingsRows, gameLines, best, worst, upsetLine, streakLines);
+// Week 2's three highest-leverage games for this pool, as buildLookaheadLines would rank and
+// render them from the same Week 1 standings above.
+const lookaheadLines = [
+  "Buffalo Bills (Rahul) at New York Jets -- Buffalo Bills 71% to win",
+  "Cincinnati Bengals (Advait) at Baltimore Ravens (Jong Ha) -- Baltimore Ravens 60% to win, a head-to-head between two managers' teams (one gains a win, the other doesn't)",
+  "Minnesota Vikings (Rahul) at Atlanta Falcons (Kaanchana) -- Minnesota Vikings 52% to win, a head-to-head between two managers' teams (one gains a win, the other doesn't)",
+];
+
+const prompt = buildPrompt({
+  poolName: "Vaibhav's friends",
+  week: 1,
+  year: 2025,
+  standingsRows,
+  gameLines,
+  best,
+  worst,
+  upsetLine,
+  streakLines,
+  upcomingWeek: 2,
+  lookaheadLines,
+});
 
 console.log("─".repeat(80));
 console.log(prompt);
