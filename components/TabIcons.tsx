@@ -65,11 +65,17 @@ export function CameraIcon() {
   );
 }
 
+/** Eight trapezoidal teeth standing on a circular body, hollow hub. The outline is generated
+ * rather than hand-drawn -- teeth evenly spaced around the body arc at 8 teeth, body r=7.1,
+ * outer r=10.2, tooth top/base 0.52/0.92 of the half-pitch -- so changing the tooth count or
+ * depth later is a parameter change rather than a redraw. It replaces a ring of detached spokes
+ * that read as a sun rather than a gear, which is also why the teeth meet the body here: the
+ * silhouette has to survive at the 20px it's actually drawn at. */
 export function GearIcon() {
   return (
-    <svg {...commonProps}>
-      <circle cx="12" cy="12" r="3.2" />
-      <path d="M12 3.5V6M12 18V20.5M20.5 12H18M6 12H3.5M18.01 6L16.25 7.76M7.75 16.25L5.99 18.01M18.01 18.01L16.25 16.25M7.75 7.75L5.99 5.99" />
+    <svg {...commonProps} strokeWidth={1.7}>
+      <path d="M9.49,5.36 L9.93,2.01 L14.07,2.01 L14.51,5.36 A7.1,7.1 0 0 1 14.92,5.53 L14.92,5.53 L17.60,3.47 L20.53,6.40 L18.47,9.08 A7.1,7.1 0 0 1 18.64,9.49 L18.64,9.49 L21.99,9.93 L21.99,14.07 L18.64,14.51 A7.1,7.1 0 0 1 18.47,14.92 L18.47,14.92 L20.53,17.60 L17.60,20.53 L14.92,18.47 A7.1,7.1 0 0 1 14.51,18.64 L14.51,18.64 L14.07,21.99 L9.93,21.99 L9.49,18.64 A7.1,7.1 0 0 1 9.08,18.47 L9.08,18.47 L6.40,20.53 L3.47,17.60 L5.53,14.92 A7.1,7.1 0 0 1 5.36,14.51 L5.36,14.51 L2.01,14.07 L2.01,9.93 L5.36,9.49 A7.1,7.1 0 0 1 5.53,9.08 L5.53,9.08 L3.47,6.40 L6.40,3.47 L9.08,5.53 A7.1,7.1 0 0 1 9.49,5.36 Z" />
+      <circle cx="12" cy="12" r="3.1" />
     </svg>
   );
 }
