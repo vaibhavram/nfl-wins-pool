@@ -58,7 +58,12 @@ export async function POST(req: Request) {
           ? [d.recipients.find((r) => r.email.toLowerCase() === previewTo.toLowerCase()) ?? { email: previewTo, name: "there" }]
           : d.recipients;
         if (recipients.length === 0) continue;
-        const imageBuffer = await renderLeaderboardImage(d.name, d.standingsRows);
+        // The email's leaderboard carries the same win probabilities the Standings tab shows;
+        // the digest's own pre/post pair collapses to the post-week number, which is "now".
+        const imageBuffer = await renderLeaderboardImage(
+          d.name,
+          d.standingsRows.map((r) => ({ name: r.name, teams: r.teams, wins: r.wins, winPct: r.postWinPct })),
+        );
         const imageToken = storeEmailImage(imageBuffer);
         const imageUrl = `${appUrl}/api/email-image/${imageToken}`;
         const link = `${appUrl}/p/${d.slug}/standings`;

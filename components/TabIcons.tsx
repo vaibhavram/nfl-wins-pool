@@ -55,3 +55,12 @@ export function DraftResultsIcon() {
     </svg>
   );
 }
+
+export function CameraIcon() {
+  return (
+    <svg {...commonProps}>
+      <path d="M3.5 8.5H6L7.5 6H16.5L18 8.5H20.5V19H3.5V8.5Z" />
+      <circle cx="12" cy="13.5" r="3.4" />
+    </svg>
+  );
+}

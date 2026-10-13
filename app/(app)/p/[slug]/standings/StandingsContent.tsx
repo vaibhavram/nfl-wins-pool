@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { TeamLogo } from "@/components/TeamLogo";
 import { PoolTabBar } from "@/components/pool/PoolTabBar";
 import { SettingsGearLink } from "@/components/pool/SettingsGearLink";
+import { SaveLeaderboardButton } from "@/components/pool/SaveLeaderboardButton";
 import { PoolSwitcher } from "@/components/pool/PoolSwitcher";
 import { TEAM } from "@/lib/teams";
 import { rostersFromPicks, totalWins, type Pick } from "@/lib/draft";
@@ -72,6 +73,7 @@ export function StandingsContent({
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <div style={{ fontSize: 11.5, color: "var(--color-neutral-600)" }}>Wins</div>
+          <SaveLeaderboardButton slug={slug} poolName={poolName} />
           <SettingsGearLink slug={slug} isCommissioner={isCommissioner} />
         </div>
       </div>
