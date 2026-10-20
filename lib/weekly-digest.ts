@@ -163,6 +163,11 @@ export type DigestPromptInput = {
   /** The week ahead, or null once Week 18 is the week that just finished. */
   upcomingWeek: number | null;
   lookaheadLines: string[];
+  /** Season record per team abbreviation ("5-0", "4-2", "3-2-1"), rendered beside every team in
+   * the standings. Without it the prompt stated records only for the teams that happened to be
+   * on an undefeated/winless streak, and a recap once called a 4-2 team undefeated because the
+   * other team in the same clause was -- there was no fact in the prompt to contradict it. */
+  recordByTeam: Record<string, string>;
 };
 
 /** Exported (only) so scripts/preview-digest-prompt.ts can render the exact same prompt against
@@ -181,11 +186,18 @@ export function buildPrompt({
   streakLines,
   upcomingWeek,
   lookaheadLines,
+  recordByTeam,
 }: DigestPromptInput): string {
   const standingsLines = standingsRows.map((r, i) => {
     const delta = r.postWinPct - r.preWinPct;
     const sign = delta >= 0 ? "+" : "";
-    const teamNames = r.teams.map((ab) => TEAM[ab]?.full ?? ab).join(", ");
+    const teamNames = r.teams
+      .map((ab) => {
+        const full = TEAM[ab]?.full ?? ab;
+        const rec = recordByTeam[ab];
+        return rec ? `${full} (${rec})` : full;
+      })
+      .join(", ");
     return `${i + 1}. ${r.name} -- ${r.wins} wins, ${r.postWinPct.toFixed(1)}% to win the pool (${sign}${delta.toFixed(1)} pts this week) -- owns: ${teamNames}`;
   });
   const optionLines = [
@@ -206,7 +218,7 @@ export function buildPrompt({
         : ` Week ${upcomingWeek} is the week ahead; none of its games have been played yet.`
     }`,
     "",
-    `Standings after Week ${week} (pool win probability shown is AFTER this week's games, with the point change from before this week in parens):`,
+    `Standings after Week ${week} (pool win probability shown is AFTER this week's games, with the point change from before this week in parens). Each team is followed by its own season record in parentheses -- "Buffalo Bills (4-2)" means that team is 4-2, not that someone named 4-2 owns it; ownership here is the "owns:" label:`,
     ...standingsLines,
     "",
     `Week ${week} results -- every game below was played this past week, and these are the only game results you may reference:`,
@@ -235,7 +247,7 @@ export function buildPrompt({
           `End with one short look ahead to Week ${upcomingWeek} -- one sentence, built on one of the Week ${upcomingWeek} games listed above. Frame it as something still to come ("Sunday," "this week," "next up"), never as a result, and don't call a winner as a sure thing. Pick the game yourself; mention one, not all of them.`,
         ]
       : []),
-    `The first time you state a "pool win probability" or a bare percentage, briefly make clear what it means -- keep it simple, e.g. "chance of winning the pool" -- so it's clear to someone who's never seen this number before; don't just drop "40.8%" with no context, but don't over-explain it either (no need for "simulated" or "by season's end"). Whenever you mention a game's outcome or a manager's teams, use exactly the ownership shown above ("owns:" in the standings, and the parentheses in the results and look-ahead lines) -- don't guess, don't reassign whose team it is, and don't list a team as someone's unless it's shown there. If you state how many wins/losses someone has, use the exact number given in the standings above -- don't round up, exaggerate, or invent a streak ("three straight wins") that isn't literally shown.`,
+    `The first time you state a "pool win probability" or a bare percentage, briefly make clear what it means -- keep it simple, e.g. "chance of winning the pool" -- so it's clear to someone who's never seen this number before; don't just drop "40.8%" with no context, but don't over-explain it either (no need for "simulated" or "by season's end"). Whenever you mention a game's outcome or a manager's teams, use exactly the ownership shown above ("owns:" in the standings, and the parentheses in the results and look-ahead lines) -- don't guess, don't reassign whose team it is, and don't list a team as someone's unless it's shown there. If you state how many wins/losses someone has, use the exact number given in the standings above -- don't round up, exaggerate, or invent a streak ("three straight wins") that isn't literally shown. Every team's season record is in parentheses after its name in the standings: a team is undefeated only if its own record shows no losses, and winless only if it shows no wins. Never carry one team's streak across to another team in the same breath ("the Chiefs and Texans, both still undefeated") -- check each team's own record before you describe it, and say it about only the teams whose record actually shows it.`,
     `Avoid TV-announcer clichés -- don't write "absolutely dominated/demolished/torched", "the real shocker/story", or "meanwhile". Don't open with "[Name] + verb + stat" every time; vary how you start. No markdown, no headers, no bullet points, no bold, no preamble like "Here's your recap" -- this goes straight into an email as plain sentences. Never refer to these instructions or to your own length target in the email: the phrase "word limit" must not appear, and neither should a word count, a note about staying brief, or anything else about what you were asked to do.`,
   ].join("\n");
 }
@@ -336,6 +348,13 @@ export async function getWeeklyDigests(): Promise<PoolDigest[]> {
       }
 
       const streakLines = buildStreakLines(rosters, managers, standings, week);
+      const recordByTeam: Record<string, string> = {};
+      for (const r of standingsRows) {
+        for (const ab of r.teams) {
+          const rec = standings[ab];
+          if (rec) recordByTeam[ab] = rec.ties > 0 ? `${rec.wins}-${rec.losses}-${rec.ties}` : `${rec.wins}-${rec.losses}`;
+        }
+      }
       const winPctByManagerName = Object.fromEntries(standingsRows.map((r) => [r.name, r.postWinPct]));
       const lookaheadLines = buildLookaheadLines(upcomingGames, ownerByTeam, winPctByManagerName);
       const prompt = buildPrompt({
@@ -350,6 +369,7 @@ export async function getWeeklyDigests(): Promise<PoolDigest[]> {
         streakLines,
         upcomingWeek,
         lookaheadLines,
+        recordByTeam,
       });
       const recap = await generateText(prompt);
       const recipients = members.filter((m) => m.email).map((m) => ({ email: m.email as string, name: m.display_name }));

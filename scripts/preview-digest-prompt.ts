@@ -50,6 +50,20 @@ const lookaheadLines = [
   "Minnesota Vikings (Rahul) at Atlanta Falcons (Kaanchana) -- Minnesota Vikings 52% to win, a head-to-head between two managers' teams (one gains a win, the other doesn't)",
 ];
 
+// Week 1 records, as buildPrompt renders them beside each team in the standings.
+const recordByTeam: Record<string, string> = {
+  BUF: "1-0", MIN: "1-0", NYG: "1-0",
+  SEA: "1-0", JAX: "1-0", CLE: "0-1",
+  SF: "1-0", PIT: "1-0", ATL: "0-1",
+  DET: "1-0", TEN: "0-1", CHI: "1-0",
+  BAL: "1-0", CAR: "0-1", DAL: "0-1",
+  HOU: "0-1", LV: "1-0",
+  TB: "0-1", GB: "0-1", ARI: "1-0",
+  NE: "0-1", IND: "0-1", PHI: "1-0",
+  CIN: "1-0", WSH: "0-1",
+  LAR: "0-1", NO: "0-1", LAC: "0-1",
+};
+
 const prompt = buildPrompt({
   poolName: "Vaibhav's friends",
   week: 1,
@@ -62,6 +76,7 @@ const prompt = buildPrompt({
   streakLines,
   upcomingWeek: 2,
   lookaheadLines,
+  recordByTeam,
 });
 
 console.log("─".repeat(80));
