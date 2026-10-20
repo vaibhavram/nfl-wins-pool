@@ -19,6 +19,7 @@ import {
 } from "./simulation";
 import { TEAM, type TeamRecord } from "./teams";
 import { generateText } from "./llm";
+import { findRecordMisattributions } from "./recap-validation";
 
 export type StandingsRow = { name: string; teams: string[]; wins: number; preWinPct: number; postWinPct: number };
 
@@ -252,6 +253,29 @@ export function buildPrompt({
   ].join("\n");
 }
 
+const RECAP_ATTEMPTS = 3;
+
+/** Asks for a recap, and asks again if it misattributes a record (see lib/recap-validation.ts --
+ * typically a streak true of one team stretched to cover another named beside it). The failure is
+ * stochastic rather than systematic: the same prompt on the same data produces a clean draft most
+ * of the time, so simply drawing again is an effective fix and costs a fraction of a cent.
+ *
+ * If every attempt misattributes something, the last one is still sent, with the issues logged.
+ * A pool getting its recap with a flaw beats a pool getting no email at all, and the log says
+ * which claim to distrust. */
+async function generateCheckedRecap(prompt: string, standings: Record<string, TeamRecord>, slug: string): Promise<string> {
+  let recap = "";
+  for (let attempt = 1; attempt <= RECAP_ATTEMPTS; attempt++) {
+    recap = await generateText(prompt);
+    const issues = findRecordMisattributions(recap, standings);
+    if (issues.length === 0) return recap;
+    const described = issues.map((i) => `${i.team} called ${i.claimed} but is ${i.actual}`).join("; ");
+    console.warn(`Weekly digest recap for ${slug}: attempt ${attempt}/${RECAP_ATTEMPTS} misattributed a record (${described})`);
+  }
+  console.error(`Weekly digest recap for ${slug}: sending the last draft despite a misattributed record`);
+  return recap;
+}
+
 /** One digest per in-season, non-test pool -- data gathering and the LLM call, but no image
  * rendering or sending (see app/api/internal/weekly-digest/route.ts for those). */
 export async function getWeeklyDigests(): Promise<PoolDigest[]> {
@@ -371,7 +395,7 @@ export async function getWeeklyDigests(): Promise<PoolDigest[]> {
         lookaheadLines,
         recordByTeam,
       });
-      const recap = await generateText(prompt);
+      const recap = await generateCheckedRecap(prompt, standings, pool.slug);
       const recipients = members.filter((m) => m.email).map((m) => ({ email: m.email as string, name: m.display_name }));
 
       return { poolId: pool.poolId, slug: pool.slug, name: pool.name, week, year, standingsRows, prompt, recap, recipients };
