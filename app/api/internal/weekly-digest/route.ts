@@ -1,8 +1,6 @@
 import { timingSafeEqual } from "crypto";
 import { NextResponse } from "next/server";
 import { getWeeklyDigests } from "@/lib/weekly-digest";
-import { renderLeaderboardImage } from "@/lib/leaderboard-image";
-import { storeEmailImage } from "@/lib/email-image-store";
 import { sendEmail } from "@/lib/email";
 import { buildDigestEmail } from "@/lib/digest-email";
 
@@ -60,16 +58,11 @@ export async function POST(req: Request) {
         if (recipients.length === 0) continue;
         // The email's leaderboard carries the same win probabilities the Standings tab shows;
         // the digest's own pre/post pair collapses to the post-week number, which is "now".
-        const imageBuffer = await renderLeaderboardImage(
-          d.name,
-          d.standingsRows.map((r) => ({ name: r.name, teams: r.teams, wins: r.wins, winPct: r.postWinPct })),
-        );
-        const imageToken = storeEmailImage(imageBuffer);
-        const imageUrl = `${appUrl}/api/email-image/${imageToken}`;
+        const rows = d.standingsRows.map((r) => ({ name: r.name, teams: r.teams, wins: r.wins, winPct: r.postWinPct }));
         const link = `${appUrl}/p/${d.slug}/standings`;
 
         for (const r of recipients) {
-          const { subject, html, text } = buildDigestEmail({ name: r.name, poolName: d.name, week: d.week, recap: d.recap, imageUrl, link });
+          const { subject, html, text } = buildDigestEmail({ name: r.name, poolName: d.name, week: d.week, recap: d.recap, rows, link });
           await sendEmail({ to: r.email, subject: previewTo ? `[PREVIEW] ${subject}` : subject, html, text });
           sent++;
         }

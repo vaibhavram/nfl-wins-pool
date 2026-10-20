@@ -8,9 +8,8 @@ import { rostersFromPicks, totalWins } from "@/lib/draft";
 import { renderLeaderboardImage, type LeaderboardImageRow } from "@/lib/leaderboard-image";
 
 // The PNG behind the Standings tab's save-to-photos button. Deliberately rendered server-side
-// with the same renderLeaderboardImage the weekly digest email uses, rather than rasterizing the
-// live DOM client-side: one layout to maintain, an image that looks the same whichever way a
-// manager received it, and no html2canvas-style dependency for a once-in-a-while button.
+// rather than rasterizing the live DOM client-side: no html2canvas-style dependency for a
+// once-in-a-while button, and the image is reproducible from the same data the page renders.
 //
 // Built from the same inputs, in the same order, as StandingsContent's own rows (live ESPN
 // standings for wins, the cached Monte Carlo for win probability, sorted by wins then win

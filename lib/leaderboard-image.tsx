@@ -1,7 +1,9 @@
 // Renders a static standings-style PNG via next/og's Satori-based image generation -- no headless
 // browser dependency, at the cost of being a recreation of the Standings tab's layout rather than
-// a literal screenshot of it. Shared by the weekly digest email and the Standings tab's own
-// save-to-photos button, so both produce the same image.
+// a literal screenshot of it. Drawn for the Standings tab's save-to-photos button only: the
+// weekly digest used to share this renderer, but an emailed image has to outlive the process that
+// made it, which an in-memory store could not do -- the email draws its own leaderboard as markup
+// now (lib/leaderboard-email.ts). The two layouts are kept in step by hand.
 import "server-only";
 import { ImageResponse } from "next/og";
 import { TEAM } from "./teams";
