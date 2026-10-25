@@ -5,9 +5,10 @@ import { TeamLogo } from "@/components/TeamLogo";
 import { SettingsGearLink } from "@/components/pool/SettingsGearLink";
 import { PoolSwitcher } from "@/components/pool/PoolSwitcher";
 import { TEAM } from "@/lib/teams";
-import { totalWins, TOTAL_PICKS } from "@/lib/draft";
+import { totalWins } from "@/lib/draft";
 import { useStandings, useWeek, useProjectedWins } from "@/lib/live-data";
-import { usePoolSimulation } from "@/lib/client/pool-live-data";
+import { usePoolSimulation, useWinProbabilitySeries } from "@/lib/client/pool-live-data";
+import { WinProbabilityChart } from "@/components/pool/WinProbabilityChart";
 import { formatWinPct, formatWins as fmtWins } from "@/lib/format";
 
 /** A manager's 3 drafted teams, with live/projected wins and pool win probability. Shared by
@@ -35,8 +36,13 @@ export function ManagerRoster({
   const { results: simResults } = usePoolSimulation(slug);
   const { week } = useWeek(null);
   const { projectedWins } = useProjectedWins();
+  const { series, loading: seriesLoading } = useWinProbabilitySeries(slug);
 
   const wins = totalWins(teams, standings);
+  // The draft receipt used to be its own block at the foot of the page; its one useful fact per
+  // team -- where it went in the draft -- now rides the team's own row instead.
+  const pickByTeam = Object.fromEntries(draftReceipt.map((p) => [p.teamAb, p.pickNo]));
+  const mySeries = series?.byManager[userId] ?? null;
   const sim = simResults.find((r) => r.manager === userId);
 
   // Any of this manager's teams currently mid-game, keyed by ab -- live score, opponent, and
@@ -95,8 +101,9 @@ export function ManagerRoster({
                   <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 3 }}>
                     <div style={{ fontSize: 15, color: "var(--color-text)" }}>{team.full}</div>
                     <div style={{ fontSize: 12.5, color: "var(--color-neutral-500)" }}>
-                      {team.div}
-                      {projectedWins[ab] !== undefined && ` · ${fmtWins(projectedWins[ab])} proj. wins`}
+                      {pickByTeam[ab] !== undefined && `Pick ${pickByTeam[ab]}`}
+                      {pickByTeam[ab] !== undefined && projectedWins[ab] !== undefined && " · "}
+                      {projectedWins[ab] !== undefined && `${fmtWins(projectedWins[ab])} proj. wins`}
                     </div>
                   </div>
                   <div style={{ fontFamily: "var(--font-heading)", fontSize: 20, color: "var(--color-text)" }}>
@@ -132,44 +139,21 @@ export function ManagerRoster({
           })}
         </div>
 
-        {draftReceipt.length > 0 && (
-          <div style={{ marginTop: 20, display: "flex", flexDirection: "column", gap: 8 }}>
-            <div style={{ fontSize: 11.5, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--color-neutral-600)" }}>
-              Draft receipt
+        {(seriesLoading || mySeries) && (
+          <div
+            style={{
+              marginTop: 20,
+              padding: "14px 14px 12px",
+              borderRadius: "var(--radius-md)",
+              background: "var(--color-surface)",
+              boxShadow: "var(--shadow-sm)",
+            }}
+          >
+            <div style={{ fontSize: 11.5, letterSpacing: ".1em", textTransform: "uppercase", color: "var(--color-neutral-600)", marginBottom: 10 }}>
+              Win probability by week
             </div>
-            <div
-              style={{
-                border: "1px solid var(--color-divider)",
-                borderRadius: "var(--radius-md)",
-                background: "var(--color-surface)",
-                overflow: "hidden",
-              }}
-            >
-              {[...draftReceipt]
-                .sort((a, b) => a.pickNo - b.pickNo)
-                .map((p, i, arr) => {
-                  const team = TEAM[p.teamAb];
-                  const round = Math.floor((p.pickNo - 1) / 10) + 1;
-                  return (
-                    <div
-                      key={p.pickNo}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 10,
-                        padding: "10px 12px",
-                        borderBottom: i < arr.length - 1 ? "1px solid var(--color-divider)" : "none",
-                      }}
-                    >
-                      <TeamLogo ab={p.teamAb} size={22} />
-                      <div style={{ flex: 1, fontSize: 13.5, color: "var(--color-text)" }}>{team?.full ?? p.teamAb}</div>
-                      <div style={{ fontSize: 12, fontFamily: "ui-monospace,monospace", color: "var(--color-neutral-500)" }}>
-                        Round {round} · Pick {p.pickNo} of {TOTAL_PICKS}
-                      </div>
-                    </div>
-                  );
-                })}
-            </div>
+            {seriesLoading && <div style={{ fontSize: 13, color: "var(--color-neutral-500)" }}>Loading…</div>}
+            {mySeries && series && <WinProbabilityChart checkpoints={series.checkpoints} values={mySeries} />}
           </div>
         )}
       </div>
