@@ -117,12 +117,6 @@ export function TeamDetailContent({
                       ● Live · {g.live.statusDetail}
                     </div>
                   )}
-                  {g.live?.downDistanceText && (
-                    <div style={{ fontSize: 11.5, color: g.live.isRedZone ? "#ef4444" : "var(--color-neutral-500)" }}>
-                      {g.live.isRedZone ? "🔴 " : ""}
-                      {g.live.downDistanceText}
-                    </div>
-                  )}
                   {!g.result && g.winProb !== null && (
                     <div style={{ fontSize: 11.5, color: g.winProb >= 0.5 ? "var(--color-accent-400)" : "var(--color-neutral-600)" }}>
                       {formatWinPct(g.winProb * 100)}% to win

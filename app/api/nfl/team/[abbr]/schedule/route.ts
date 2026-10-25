@@ -29,8 +29,6 @@ export async function GET(_req: Request, ctx: RouteContext<"/api/nfl/team/[abbr]
         myScore: home ? g.homeScore : g.awayScore,
         oppScore: home ? g.awayScore : g.homeScore,
         statusDetail: g.statusDetail,
-        downDistanceText: g.downDistanceText,
-        isRedZone: g.isRedZone,
         hasPossession: g.possession === (home ? "home" : "away"),
       };
     })();

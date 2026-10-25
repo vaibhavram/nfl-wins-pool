@@ -205,13 +205,16 @@ export async function getStandings(): Promise<Record<string, TeamRecord>> {
 
 /** A live game's state from one particular team's point of view -- the scoreboard reports home
  * and away, but a team's own schedule row only cares about "us" and "them". Null on every row
- * that isn't currently in progress. */
+ * that isn't currently in progress.
+ *
+ * Deliberately just the score and the clock: a team's schedule is a season-long list, read to see
+ * how the year is going, so a live row there says what the score is and how much football is left
+ * to change it. Down-and-distance and the red-zone flag live on the Schedule tab, which is the
+ * play-by-play view. */
 export type TeamScheduleLive = {
   myScore: number;
   oppScore: number;
-  statusDetail: string; // ESPN's own short status text, e.g. "8:42 - 3rd"
-  downDistanceText: string | null;
-  isRedZone: boolean;
+  statusDetail: string; // ESPN's own short status text, e.g. "8:42 - 3rd" -- quarter and time left
   hasPossession: boolean; // whether *this* team has the ball, not the home team
 };
 
