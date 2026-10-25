@@ -203,6 +203,18 @@ export async function getStandings(): Promise<Record<string, TeamRecord>> {
 
 // ── Per-team full-season schedule ───────────────────────────────────────────
 
+/** A live game's state from one particular team's point of view -- the scoreboard reports home
+ * and away, but a team's own schedule row only cares about "us" and "them". Null on every row
+ * that isn't currently in progress. */
+export type TeamScheduleLive = {
+  myScore: number;
+  oppScore: number;
+  statusDetail: string; // ESPN's own short status text, e.g. "8:42 - 3rd"
+  downDistanceText: string | null;
+  isRedZone: boolean;
+  hasPossession: boolean; // whether *this* team has the ball, not the home team
+};
+
 export type TeamScheduleRow = {
   id: string; // ESPN's event id -- "" for the synthetic bye-week row; addresses the same game in getSeasonGameData
   week: number;

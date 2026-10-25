@@ -27,7 +27,7 @@ export function TeamDetailContent({
   const team = TEAM[ab];
 
   const { standings } = useStandings();
-  const { schedule, loading, error } = useTeamSchedule(team ? ab : null);
+  const { schedule, currentWeek, loading, error } = useTeamSchedule(team ? ab : null);
   const { projectedWins } = useProjectedWins();
   const rec = standings[ab];
   const projected = projectedWins[ab];
@@ -80,6 +80,9 @@ export function TeamDetailContent({
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
           {(schedule ?? []).map((g) => {
             const bye = g.at === "" && g.opponent === "Bye week";
+            // The week the league is currently in, highlighted with the same accent pair the rest
+            // of the app uses for "this row is the one that concerns you".
+            const thisWeek = currentWeek !== null && g.week === currentWeek;
             return (
               <div
                 key={g.week}
@@ -89,14 +92,37 @@ export function TeamDetailContent({
                   gap: 10,
                   padding: "9px 11px",
                   borderRadius: "var(--radius-md)",
-                  background: bye ? "transparent" : "var(--color-surface)",
-                  border: `1px solid ${bye ? "var(--color-neutral-900)" : "var(--color-divider)"}`,
+                  background: thisWeek ? "var(--color-accent-900)" : bye ? "transparent" : "var(--color-surface)",
+                  border: `1px solid ${thisWeek ? "var(--color-accent-700)" : bye ? "var(--color-neutral-900)" : "var(--color-divider)"}`,
                 }}
               >
-                <div style={{ width: 26, fontFamily: "ui-monospace,monospace", fontSize: 11.5, color: "var(--color-neutral-600)" }}>W{g.week}</div>
+                <div
+                  style={{
+                    width: 26,
+                    fontFamily: "ui-monospace,monospace",
+                    fontSize: 11.5,
+                    color: thisWeek ? "var(--color-accent-300)" : "var(--color-neutral-600)",
+                  }}
+                >
+                  W{g.week}
+                </div>
                 <div style={{ width: 20, fontSize: 11, color: "var(--color-neutral-600)" }}>{g.at}</div>
                 <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 1 }}>
-                  <div style={{ fontSize: 13.5, color: bye ? "var(--color-neutral-600)" : "var(--color-text)" }}>{g.opponent}</div>
+                  <div style={{ fontSize: 13.5, color: bye ? "var(--color-neutral-600)" : "var(--color-text)" }}>
+                    {g.opponent}
+                    {g.live?.hasPossession && <span style={{ color: "var(--color-accent-300)", fontSize: 11 }}> ●</span>}
+                  </div>
+                  {g.live && (
+                    <div style={{ fontSize: 11.5, color: "var(--color-accent-300)" }}>
+                      ● Live · {g.live.statusDetail}
+                    </div>
+                  )}
+                  {g.live?.downDistanceText && (
+                    <div style={{ fontSize: 11.5, color: g.live.isRedZone ? "#ef4444" : "var(--color-neutral-500)" }}>
+                      {g.live.isRedZone ? "🔴 " : ""}
+                      {g.live.downDistanceText}
+                    </div>
+                  )}
                   {!g.result && g.winProb !== null && (
                     <div style={{ fontSize: 11.5, color: g.winProb >= 0.5 ? "var(--color-accent-400)" : "var(--color-neutral-600)" }}>
                       {formatWinPct(g.winProb * 100)}% to win
@@ -113,8 +139,16 @@ export function TeamDetailContent({
                 >
                   {g.result}
                 </div>
-                <div style={{ width: 62, textAlign: "right", fontFamily: "ui-monospace,monospace", fontSize: 11.5, color: "var(--color-neutral-500)" }}>
-                  {g.result ? g.detail : g.date ? formatKickoff(g.date) : ""}
+                <div
+                  style={{
+                    width: 62,
+                    textAlign: "right",
+                    fontFamily: "ui-monospace,monospace",
+                    fontSize: g.live ? 13 : 11.5,
+                    color: g.live ? "var(--color-text)" : "var(--color-neutral-500)",
+                  }}
+                >
+                  {g.live ? `${g.live.myScore}–${g.live.oppScore}` : g.result ? g.detail : g.date ? formatKickoff(g.date) : ""}
                 </div>
               </div>
             );

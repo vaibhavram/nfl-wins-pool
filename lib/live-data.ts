@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { LiveGame, TeamScheduleRow } from "./espn";
+import type { LiveGame, TeamScheduleRow, TeamScheduleLive } from "./espn";
 import type { TeamRecord } from "./teams";
 import { GAME_STATE_POLL_MS, IDLE_POLL_MS, isGameActive } from "./game-window";
 
@@ -133,14 +133,16 @@ export function useSimulation() {
   return { results: data?.results ?? [], loading, error };
 }
 
-export type TeamScheduleRowWithProb = TeamScheduleRow & { winProb: number | null };
+export type TeamScheduleRowWithProb = TeamScheduleRow & { winProb: number | null; live: TeamScheduleLive | null };
 
 export function useTeamSchedule(abbr: string | null) {
   const url = abbr ? `/api/nfl/team/${abbr}/schedule` : null;
-  const { data, loading, error } = useLivePolledFetch<{ schedule: TeamScheduleRowWithProb[]; hasLiveGame: boolean }>(url, (d) =>
-    d.schedule.some((g) => g.date && isGameActive(g.state, g.date)),
-  );
-  return { schedule: data?.schedule ?? null, loading, error };
+  const { data, loading, error } = useLivePolledFetch<{
+    schedule: TeamScheduleRowWithProb[];
+    hasLiveGame: boolean;
+    currentWeek: number;
+  }>(url, (d) => d.schedule.some((g) => g.date && isGameActive(g.state, g.date)));
+  return { schedule: data?.schedule ?? null, currentWeek: data?.currentWeek ?? null, loading, error };
 }
 
 const PRESENCE_POLL_MS = 8000;
