@@ -1,55 +1,43 @@
-// Each manager's pool win probability at the end of every week so far, plus a Pre-W1 baseline --
-// the data behind the win-probability chart on a manager's page.
+// Each manager's pool win probability through the season, for the chart on a manager's page.
 //
-// Computed rather than read back from win_probability_snapshots (migration 006): that table only
-// starts on 2026-09-14, when the daily job shipped, which is partway through Week 2, so it has no
-// Pre-W1 and no Week 1 row and never will. Recomputing from game data gives the whole season and
-// gives the same answer every time it runs.
+// Two sources, because no single one can tell the whole story honestly:
 //
-// The method is lib/weekly-digest.ts's "pre-week" counterfactual generalised: for checkpoint k,
-// games in weeks <= k keep the result they actually had and everything after is rolled back to
-// its pre-game probability, resolved the way any not-yet-played game is (ESPN's Matchup
-// Predictor, falling back to FPI). Checkpoint 0 rolls back the whole season, which is the
-// preseason picture.
+//   Pre-W1  the preseason Vegas win totals (lib/preseason-baseline.ts). The season cannot be
+//           replayed to recover this: ESPN drops a game's pre-game predictor once it is final, so
+//           a replay prices every matchup with today's ratings and "before the season" comes out
+//           knowing which teams collapsed.
+//   W1..Wn  win_probability_snapshots -- what this app actually computed on the day. Real history,
+//           not a reconstruction, but it only begins on 2026-09-14, so early weeks of this season
+//           have no row and come back null. The chart leaves those slots empty rather than
+//           inventing them.
+//
+// The two are different models meeting at the left edge, which is the price of the Pre-W1 bar
+// being a real preseason number instead of a backwards-looking one.
 import "server-only";
-import { getCurrentRegularSeasonWeek, getGamePredictor } from "./espn";
-import {
-  getSeasonGameData,
-  getHomeWinProbabilityFpi,
-  runSimulationWithGames,
-  REGULAR_SEASON_WEEKS,
-  type SimGame,
-} from "./simulation";
+import { query } from "./db2";
+import { getCurrentRegularSeasonWeek, getRegularSeasonWeeks } from "./espn";
+import { getSeasonGameData, REGULAR_SEASON_WEEKS, type SimGame } from "./simulation";
+import { getPreseasonWinProbabilities } from "./preseason-baseline";
 import type { Pick } from "./draft";
 
-// A trend line, not a precision instrument: at 4k trials each point carries well under a
-// percentage point of noise, and the series needs one simulation per week rather than one.
-const SERIES_TRIALS = 4000;
-const PREDICTOR_CONCURRENCY = 12; // courtesy cap, matching lib/simulation.ts
+const PRESEASON_TRIALS = 10000;
 
 export type WinProbabilitySeries = {
   /** "Pre-W1", "W1", "W2", ... -- one label per point, in order. */
   checkpoints: string[];
-  /** Pool win probability (0-100) per manager id, one entry per checkpoint. */
-  byManager: Record<string, number[]>;
+  /** Pool win probability (0-100) per manager id, one entry per checkpoint; null where no
+   * snapshot exists for that week. */
+  byManager: Record<string, (number | null)[]>;
 };
 
-async function mapWithConcurrency<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
-  const results: R[] = new Array(items.length);
-  let next = 0;
-  async function worker() {
-    while (next < items.length) {
-      const i = next++;
-      results[i] = await fn(items[i]);
-    }
-  }
-  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
-  return results;
+/** YYYY-MM-DD in Pacific time -- the calendar day win_probability_snapshots is keyed by, so week
+ * boundaries have to be converted into the same frame before they can be compared. */
+function pacificDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" });
 }
 
-/** The last week whose games are all final. Weeks run in order, so a week with a game still to
- * play ends the series -- a half-finished week would read as a real move in the chart when it is
- * only a partial one. */
+/** The last week whose games are all final. A week still being played would read as a real move
+ * in the chart when it is only a partial one. */
 function lastCompletedWeek(games: SimGame[]): number {
   for (let week = 1; week <= REGULAR_SEASON_WEEKS; week++) {
     const inWeek = games.filter((g) => g.week === week);
@@ -58,11 +46,10 @@ function lastCompletedWeek(games: SimGame[]): number {
   return REGULAR_SEASON_WEEKS;
 }
 
+type SnapshotRow = { user_id: string; snapshot_date: string; win_pct: string };
+
 const cache = new Map<string, { data: WinProbabilitySeries; expiresAt: number }>();
-// A completed week's point never moves again, and the newest point is itself a completed week, so
-// the whole series is stable until another week finishes. Cached long and keyed by how many weeks
-// are in the books, which is what actually invalidates it.
-const SERIES_TTL_MS = 6 * 60 * 60 * 1000;
+const SERIES_TTL_MS = 6 * 60 * 60 * 1000; // only moves when a week finishes or a snapshot lands
 
 export async function getWinProbabilitySeries(seasonId: string, picks: Pick[], roster: string[]): Promise<WinProbabilitySeries> {
   const { year } = await getCurrentRegularSeasonWeek();
@@ -73,24 +60,34 @@ export async function getWinProbabilitySeries(seasonId: string, picks: Pick[], r
   const cached = cache.get(key);
   if (cached && cached.expiresAt > Date.now()) return cached.data;
 
-  // A completed game's pre-game probability isn't kept on SimGame (it carries a 0.5 placeholder),
-  // so it's re-resolved here. Cheap in practice: getGamePredictor caches for 24h.
-  const completed = games.filter((g) => g.fixedResult !== null);
-  const preGameProbs = await mapWithConcurrency(completed, PREDICTOR_CONCURRENCY, async (g) => {
-    const predicted = await getGamePredictor(g.id);
-    return [g.id, predicted ?? (await getHomeWinProbabilityFpi(g.home, g.away))] as const;
-  });
-  const preGameProbById = new Map(preGameProbs);
+  const [preseason, calendar, snapshots] = await Promise.all([
+    getPreseasonWinProbabilities(picks, roster, games, year, PRESEASON_TRIALS),
+    getRegularSeasonWeeks(),
+    query<SnapshotRow>(
+      `SELECT user_id, snapshot_date::text AS snapshot_date, win_pct
+         FROM win_probability_snapshots
+        WHERE season_id = $1
+        ORDER BY snapshot_date ASC`,
+      [seasonId],
+    ),
+  ]);
+
+  // The end of week N is that week's calendar end (weeks run Wednesday to Tuesday), so the value
+  // "after week N" is the last snapshot taken on or before that day. The daily job runs at 11pm
+  // Pacific, which puts a snapshot right at each boundary.
+  const endOfWeek = new Map(calendar.map((w) => [w.week, pacificDate(w.endDate)]));
 
   const checkpoints = ["Pre-W1", ...Array.from({ length: weeks }, (_, i) => `W${i + 1}`)];
-  const byManager: Record<string, number[]> = Object.fromEntries(roster.map((m) => [m, []]));
-
-  for (let k = 0; k <= weeks; k++) {
-    const asOf: SimGame[] = games.map((g) =>
-      g.week <= k ? g : { ...g, fixedResult: null, pHomeWin: preGameProbById.get(g.id) ?? g.pHomeWin },
-    );
-    const summary = await runSimulationWithGames(picks, roster, asOf, year, SERIES_TRIALS);
-    for (const r of summary.results) byManager[r.manager]?.push(r.winPct);
+  const byManager: Record<string, (number | null)[]> = {};
+  for (const m of roster) {
+    const mine = snapshots.filter((s) => s.user_id === m);
+    const points: (number | null)[] = [preseason[m] ?? null];
+    for (let week = 1; week <= weeks; week++) {
+      const boundary = endOfWeek.get(week);
+      const upTo = boundary ? mine.filter((s) => s.snapshot_date <= boundary) : [];
+      points.push(upTo.length > 0 ? Number(upTo[upTo.length - 1].win_pct) : null);
+    }
+    byManager[m] = points;
   }
 
   const data: WinProbabilitySeries = { checkpoints, byManager };

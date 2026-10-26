@@ -1,16 +1,22 @@
 "use client";
 
 import { useState } from "react";
+import { formatWinPct } from "@/lib/format";
 /** One manager's pool win probability at the end of each week, with a Pre-W1 baseline.
  *
  * Inline SVG rather than a charting library: one chart, one series, and the app ships no chart
  * dependency today. Single series means no legend -- the heading says what is plotted.
  *
  * Every bar carries its value, rounded to a whole percent -- at this size the decimal was noise,
- * and a two-digit label still fits a bar once a full 19-week season has filled the axis. */
-export function WinProbabilityChart({ checkpoints, values }: { checkpoints: string[]; values: number[] }) {
+ * and a two-digit label still fits a bar once a full 19-week season has filled the axis. The
+ * hover readout keeps the decimal, which is where it earns its place: it's the difference between
+ * a long shot at 0.4% and one that is genuinely finished. */
+export function WinProbabilityChart({ checkpoints, values }: { checkpoints: string[]; values: (number | null)[] }) {
   const [hover, setHover] = useState<number | null>(null);
-  if (checkpoints.length === 0 || values.length === 0) return null;
+  // A week with no recorded snapshot is a gap, not a zero -- it keeps its slot on the axis and
+  // draws nothing, so the shape of the season isn't distorted by data that was never captured.
+  const known = values.filter((v): v is number => v !== null);
+  if (checkpoints.length === 0 || known.length === 0) return null;
 
   const W = 320;
   const H = 132; // plot only; the x-axis band is laid out below it, not squeezed inside
@@ -23,7 +29,7 @@ export function WinProbabilityChart({ checkpoints, values }: { checkpoints: stri
   // A probability axis, so the scale is anchored at zero and topped at a round number above the
   // peak rather than fitted tightly to the data -- a bar chart that doesn't start at zero
   // misstates every comparison on it.
-  const peak = Math.max(...values, 1);
+  const peak = Math.max(...known, 1);
   const top = Math.min(100, Math.ceil(peak / 25) * 25);
   const ticks = [0, top / 2, top];
 
@@ -35,7 +41,7 @@ export function WinProbabilityChart({ checkpoints, values }: { checkpoints: stri
   // Roughly 0.62em per digit at these sizes.
   const labelSize = band >= 24 ? 9 : 8;
   const labelFor = (v: number) => String(Math.round(v));
-  const fits = values.every((v) => labelFor(v).length * labelSize * 0.62 <= band - 1);
+  const fits = known.every((v) => labelFor(v).length * labelSize * 0.62 <= band - 1);
 
   return (
     <div style={{ position: "relative" }}>
@@ -50,8 +56,23 @@ export function WinProbabilityChart({ checkpoints, values }: { checkpoints: stri
           </g>
         ))}
         {values.map((v, i) => {
-          const barH = Math.max(1, (v / top) * plotH);
           const active = hover === i;
+          if (v === null) {
+            // Still hoverable, so the empty slot can say why it's empty.
+            return (
+              <rect
+                key={i}
+                x={PAD_L + i * band}
+                y={PAD_T}
+                width={band}
+                height={plotH}
+                fill="transparent"
+                onPointerEnter={() => setHover(i)}
+                onPointerLeave={() => setHover(null)}
+              />
+            );
+          }
+          const barH = Math.max(1, (v / top) * plotH);
           return (
             <g key={i} onPointerEnter={() => setHover(i)} onPointerLeave={() => setHover(null)}>
               {/* full-height hit target, so a 2px bar is still hoverable */}
@@ -104,7 +125,10 @@ export function WinProbabilityChart({ checkpoints, values }: { checkpoints: stri
       {/* Reserved whether or not anything is hovered, so the card doesn't jump as the pointer
           moves across the bars. */}
       <div style={{ marginTop: 6, fontSize: 11.5, color: "var(--color-neutral-500)", minHeight: 16 }}>
-        {hover !== null && `${checkpoints[hover]}: ${Math.round(values[hover])}% chance of winning the pool`}
+        {hover !== null &&
+          (values[hover] === null
+            ? `${checkpoints[hover]}: not recorded — daily snapshots began partway through the season`
+            : `${checkpoints[hover]}: ${formatWinPct(values[hover] as number)}% chance of winning the pool`)}
       </div>
     </div>
   );

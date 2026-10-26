@@ -42,6 +42,18 @@ export async function getCurrentRegularSeasonWeek(): Promise<{ week: number; yea
   return { week: entries.length, year };
 }
 
+export type RegularSeasonWeek = { week: number; startDate: string; endDate: string };
+
+/** Every regular-season week with the window ESPN considers it to span. Weeks run Wednesday to
+ * Tuesday, so "the end of week N" -- which is what a weekly history is indexed by -- is this
+ * entry's endDate, not the Sunday the games were played on. */
+export async function getRegularSeasonWeeks(): Promise<RegularSeasonWeek[]> {
+  const data = await getJson<ScoreboardResponse>(`${SITE_BASE}/scoreboard`, CALENDAR_REVALIDATE_SECONDS);
+  const regSeason = data.leagues[0].calendar.find((b) => b.value === String(REGULAR_SEASON));
+  if (!regSeason) return [];
+  return regSeason.entries.map((e) => ({ week: Number(e.value), startDate: e.startDate, endDate: e.endDate }));
+}
+
 // ── Week scoreboard ──────────────────────────────────────────────────────
 
 export type LiveGame = {
