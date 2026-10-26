@@ -1,14 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { formatWinPct } from "@/lib/format";
-
 /** One manager's pool win probability at the end of each week, with a Pre-W1 baseline.
  *
  * Inline SVG rather than a charting library: one chart, one series, and the app ships no chart
- * dependency today. Single series means no legend -- the heading says what is plotted -- and the
- * values are direct-labelled only at the ends, with the rest carried by the axis and the hover
- * tooltip, so the bars stay the loudest thing on the card. */
+ * dependency today. Single series means no legend -- the heading says what is plotted.
+ *
+ * Every bar carries its value, rounded to a whole percent -- at this size the decimal was noise,
+ * and a two-digit label still fits a bar once a full 19-week season has filled the axis. */
 export function WinProbabilityChart({ checkpoints, values }: { checkpoints: string[]; values: number[] }) {
   const [hover, setHover] = useState<number | null>(null);
   if (checkpoints.length === 0 || values.length === 0) return null;
@@ -17,7 +16,7 @@ export function WinProbabilityChart({ checkpoints, values }: { checkpoints: stri
   const H = 132; // plot only; the x-axis band is laid out below it, not squeezed inside
   const PAD_L = 26;
   const PAD_R = 6;
-  const PAD_T = 10;
+  const PAD_T = 16; // room for the value sitting above the tallest bar
   const plotW = W - PAD_L - PAD_R;
   const plotH = H - PAD_T;
 
@@ -33,9 +32,10 @@ export function WinProbabilityChart({ checkpoints, values }: { checkpoints: stri
   const x = (i: number) => PAD_L + i * band + (band - barW) / 2;
   const y = (v: number) => PAD_T + plotH - (v / top) * plotH;
 
-  const lastIndex = values.length - 1;
-  const peakIndex = values.indexOf(Math.max(...values));
-  const labelled = new Set([0, lastIndex, peakIndex]);
+  // Roughly 0.62em per digit at these sizes.
+  const labelSize = band >= 24 ? 9 : 8;
+  const labelFor = (v: number) => String(Math.round(v));
+  const fits = values.every((v) => labelFor(v).length * labelSize * 0.62 <= band - 1);
 
   return (
     <div style={{ position: "relative" }}>
@@ -66,9 +66,16 @@ export function WinProbabilityChart({ checkpoints, values }: { checkpoints: stri
               />
               {/* square off the rounded corners where the bar meets the baseline */}
               <rect x={x(i)} y={y(v) + barH - Math.min(4, barH)} width={barW} height={Math.min(4, barH)} fill={active ? "var(--color-accent-300)" : "var(--color-accent-500)"} />
-              {labelled.has(i) && !active && (
-                <text x={x(i) + barW / 2} y={y(v) - 4} textAnchor="middle" fontSize={9} fill="var(--color-neutral-400)" style={{ fontVariantNumeric: "tabular-nums" }}>
-                  {formatWinPct(v)}
+              {fits && (
+                <text
+                  x={x(i) + barW / 2}
+                  y={y(v) - 4}
+                  textAnchor="middle"
+                  fontSize={labelSize}
+                  fill={active ? "var(--color-text)" : "var(--color-neutral-400)"}
+                  style={{ fontVariantNumeric: "tabular-nums" }}
+                >
+                  {labelFor(v)}
                 </text>
               )}
             </g>
@@ -94,10 +101,10 @@ export function WinProbabilityChart({ checkpoints, values }: { checkpoints: stri
           </div>
         ))}
       </div>
+      {/* Reserved whether or not anything is hovered, so the card doesn't jump as the pointer
+          moves across the bars. */}
       <div style={{ marginTop: 6, fontSize: 11.5, color: "var(--color-neutral-500)", minHeight: 16 }}>
-        {hover !== null
-          ? `${checkpoints[hover]}: ${formatWinPct(values[hover])}% chance of winning the pool`
-          : `${formatWinPct(values[lastIndex])}% after ${checkpoints[lastIndex]}, from ${formatWinPct(values[0])}% before the season`}
+        {hover !== null && `${checkpoints[hover]}: ${Math.round(values[hover])}% chance of winning the pool`}
       </div>
     </div>
   );
